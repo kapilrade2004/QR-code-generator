@@ -1,11 +1,14 @@
 "use client"
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { 
   Link as LinkIcon, FileText, User, File, AppWindow, MessageSquare, Mail, Phone, Share2, 
   Download, Copy, Palette, CheckCircle, Volume2, MapPin, UploadCloud
 } from 'lucide-react';
+import Navbar from '@/components/Navbar';
+import AuthModal from '@/components/AuthModal';
+import ActivityModal, { QrLogItem } from '@/components/ActivityModal';
 
 const tabs = [
   { id: 'url', label: 'URL', icon: LinkIcon },
@@ -21,9 +24,69 @@ const tabs = [
 ];
 
 export default function QrCodeGeneratorPage() {
+  const [user, setUser] = useState<{ id: string; email: string; name?: string } | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
   const [activeTab, setActiveTab] = useState('url');
   const [copied, setCopied] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
+
+  // Fetch logged in user on mount - Enforce login first
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated && data.user) {
+          setUser({
+            id: data.user.userId,
+            email: data.user.email,
+            name: data.user.name
+          });
+          setAuthModalOpen(false);
+        } else {
+          setUser(null);
+          setAuthModalOpen(true);
+        }
+      })
+      .catch(() => {
+        setUser(null);
+        setAuthModalOpen(true);
+      })
+      .finally(() => {
+        setAuthLoading(false);
+      });
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setUser(null);
+      setAuthModalOpen(true);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
+  const logQrAction = async (action: 'GENERATED' | 'DOWNLOADED' | 'COPIED', payloadValue: string) => {
+    if (!user) return;
+    try {
+      await fetch('/api/qr/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          qrType: activeTab,
+          payload: payloadValue,
+          title: `${activeTab.toUpperCase()} QR`,
+          action
+        })
+      });
+    } catch (err) {
+      console.error('Failed to log QR action:', err);
+    }
+  };
 
   // Form states
   const [url, setUrl] = useState('');
@@ -69,6 +132,7 @@ export default function QrCodeGeneratorPage() {
       a.download = 'qrcode.png';
       a.href = u;
       a.click();
+      logQrAction('DOWNLOADED', qrValue);
     }
   };
 
@@ -82,12 +146,37 @@ export default function QrCodeGeneratorPage() {
               new ClipboardItem({ 'image/png': blob })
             ]);
             setCopied(true);
+            logQrAction('COPIED', qrValue);
             setTimeout(() => setCopied(false), 2000);
           } catch (err) {
             console.error('Failed to copy image: ', err);
           }
         }
       });
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user) {
+      setAuthModalOpen(true);
+      return;
+    }
+    await logQrAction('GENERATED', qrValue);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2500);
+  };
+
+  const handleLoadFromHistory = (item: QrLogItem) => {
+    if (tabs.some(t => t.id === item.qrType)) {
+      setActiveTab(item.qrType);
+    }
+    if (item.qrType === 'url') {
+      setUrl(item.payload);
+    } else if (item.qrType === 'plain-text') {
+      setText(item.payload);
+    } else if (item.qrType === 'location') {
+      const loc = item.payload.replace('https://maps.google.com/?q=', '');
+      setLocationStr(decodeURIComponent(loc));
     }
   };
 
@@ -126,11 +215,70 @@ export default function QrCodeGeneratorPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 min-h-full bg-slate-50 flex items-start justify-center overflow-auto">
-      <div className="max-w-6xl w-full bg-white border border-slate-200 shadow-sm rounded-3xl overflow-hidden shadow-2xl p-6 md:p-8 flex flex-col md:flex-row gap-8">
-        
-        {/* Left Side (Controls) */}
-        <div className="flex-1 flex flex-col space-y-8 min-w-0">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <Navbar
+        user={user}
+        onOpenAuth={() => setAuthModalOpen(true)}
+        onOpenActivity={() => {
+          if (!user) {
+            setAuthModalOpen(true);
+          } else {
+            setActivityModalOpen(true);
+          }
+        }}
+        onLogout={handleLogout}
+      />
+
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => {
+          if (user) setAuthModalOpen(false);
+        }}
+        preventClose={!user}
+        onSuccess={(newUser) => {
+          setUser(newUser);
+          setAuthModalOpen(false);
+        }}
+      />
+
+      <ActivityModal
+        isOpen={activityModalOpen}
+        onClose={() => setActivityModalOpen(false)}
+        onSelectQr={handleLoadFromHistory}
+      />
+
+      {/* If loading authentication status */}
+      {authLoading ? (
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-slate-500 text-sm font-medium">Checking authentication...</p>
+        </div>
+      ) : !user ? (
+        /* If user is not logged in - Restrict screen */
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <div className="max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 font-bold text-2xl">
+              QR
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">Login Required</h2>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+              Please sign in or create an account to access the QR Code Generator and tracking tools.
+            </p>
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+            >
+              Sign In / Register
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* When logged in - Allow using the service */
+        <main className="p-4 md:p-8 flex-1 flex items-start justify-center overflow-auto">
+        <div className="max-w-6xl w-full bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-2xl p-6 md:p-8 flex flex-col md:flex-row gap-8">
+          
+          {/* Left Side (Controls) */}
+          <div className="flex-1 flex flex-col space-y-8 min-w-0">
           
           {/* Tabs */}
           <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">
@@ -402,16 +550,23 @@ export default function QrCodeGeneratorPage() {
             </div>
           ) : (
             <div className="flex gap-2 h-12">
-              <button className="flex-1 bg-slate-200 hover:bg-white text-slate-800 font-bold rounded-xl flex items-center justify-center transition-colors">
-                Save
+              <button 
+                onClick={handleSave}
+                className={`flex-1 font-bold rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  saveSuccess 
+                    ? 'bg-emerald-600 text-white shadow-md' 
+                    : 'bg-slate-200 hover:bg-white text-slate-800'
+                }`}
+              >
+                {saveSuccess ? 'Saved to Logs!' : 'Save'}
               </button>
-              <button onClick={handleDownload} className="w-12 bg-slate-200 hover:bg-white text-slate-600 rounded-xl flex items-center justify-center transition-colors" title="Download">
+              <button onClick={handleDownload} className="w-12 bg-slate-200 hover:bg-white text-slate-600 rounded-xl flex items-center justify-center transition-colors cursor-pointer" title="Download">
                 <Download className="w-5 h-5" />
               </button>
-              <button onClick={handleCopy} className="w-12 bg-slate-200 hover:bg-white text-slate-600 rounded-xl flex items-center justify-center transition-colors relative" title="Copy to Clipboard">
+              <button onClick={handleCopy} className="w-12 bg-slate-200 hover:bg-white text-slate-600 rounded-xl flex items-center justify-center transition-colors relative cursor-pointer" title="Copy to Clipboard">
                 {copied ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5" />}
               </button>
-              <button className="w-12 bg-slate-200 hover:bg-white text-slate-600 rounded-xl flex items-center justify-center transition-colors" title="Customize">
+              <button className="w-12 bg-slate-200 hover:bg-white text-slate-600 rounded-xl flex items-center justify-center transition-colors cursor-pointer" title="Customize">
                 <Palette className="w-5 h-5" />
               </button>
             </div>
@@ -419,6 +574,8 @@ export default function QrCodeGeneratorPage() {
         </div>
 
       </div>
+      </main>
+      )}
     </div>
   );
 }

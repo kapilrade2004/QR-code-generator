@@ -1,0 +1,45 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  loginLogs    LoginLog[]
+  qrLogs       QrActivityLog[]
+}
+
+model LoginLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userEmail String
+  ipAddress String?
+  userAgent String?
+  status    String   // "SUCCESS" | "FAILED"
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model QrActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  qrType    String   // "url" | "plain-text" | "contact" | "app" | "location" | "pdf" | etc.
+  title     String?
+  payload   String
+  metadata  String?  // JSON string for attributes
+  action    String   // "GENERATED" | "DOWNLOADED" | "COPIED"
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

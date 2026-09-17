@@ -1,0 +1,76 @@
+{
+  "users": [
+    {
+      "id": "usr_eav46ihmu5tg339",
+      "email": "kapilrade2004@gmail.com",
+      "name": "kapil",
+      "passwordHash": "$2b$10$otILh5toHei5r/0/WvL9T.21HlkMEHe1ncdlxuyjnuceXX8JuhZVG",
+      "createdAt": "2026-09-17T17:41:10.437Z"
+    }
+  ],
+  "loginLogs": [
+    {
+      "id": "log_21c1c8bmu5tg33m",
+      "userId": "usr_eav46ihmu5tg339",
+      "userEmail": "kapilrade2004@gmail.com",
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+      "status": "SUCCESS",
+      "createdAt": "2026-09-17T17:41:10.450Z"
+    },
+    {
+      "id": "log_9q7ib8rmu5tftiq",
+      "userEmail": "kapilrade2004@gmail.com",
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+      "status": "FAILED",
+      "createdAt": "2026-09-17T17:40:58.034Z"
+    }
+  ],
+  "qrLogs": [
+    {
+      "id": "qr_yppan7qmu5ti3oa",
+      "userId": "usr_eav46ihmu5tg339",
+      "userEmail": "kapilrade2004@gmail.com",
+      "qrType": "plain-text",
+      "title": "PLAIN-TEXT QR",
+      "payload": "hii",
+      "metadata": {},
+      "action": "GENERATED",
+      "createdAt": "2026-09-17T17:42:44.506Z"
+    },
+    {
+      "id": "qr_wocmqdbmu5ti21f",
+      "userId": "usr_eav46ihmu5tg339",
+      "userEmail": "kapilrade2004@gmail.com",
+      "qrType": "plain-text",
+      "title": "PLAIN-TEXT QR",
+      "payload": "hii",
+      "metadata": {},
+      "action": "GENERATED",
+      "createdAt": "2026-09-17T17:42:42.387Z"
+    },
+    {
+      "id": "qr_iycpwhzmu5th28a",
+      "userId": "usr_eav46ihmu5tg339",
+      "userEmail": "kapilrade2004@gmail.com",
+      "qrType": "url",
+      "title": "URL QR",
+      "payload": "http://localhost:3000/project-tracker",
+      "metadata": {},
+      "action": "GENERATED",
+      "createdAt": "2026-09-17T17:41:55.978Z"
+    },
+    {
+      "id": "qr_ap0ufbfmu5th0pf",
+      "userId": "usr_eav46ihmu5tg339",
+      "userEmail": "kapilrade2004@gmail.com",
+      "qrType": "url",
+      "title": "URL QR",
+      "payload": "http://localhost:3000/project-tracker",
+      "metadata": {},
+      "action": "GENERATED",
+      "createdAt": "2026-09-17T17:41:54.003Z"
+    }
+  ]
+}
