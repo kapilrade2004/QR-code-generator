@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import AuthModal from '@/components/AuthModal';
-import ActivityModal, { QrLogItem } from '@/components/ActivityModal';
+import ActivityModal from '@/components/ActivityModal';
 
 const tabs = [
   { id: 'url', label: 'URL', icon: LinkIcon },
@@ -239,20 +239,6 @@ export default function QrCodeGeneratorPage() {
     }
   };
 
-  const handleLoadFromHistory = (item: QrLogItem) => {
-    if (tabs.some(t => t.id === item.qrType)) {
-      setActiveTab(item.qrType);
-    }
-    if (item.qrType === 'url') {
-      setUrl(item.payload);
-    } else if (item.qrType === 'plain-text') {
-      setText(item.payload);
-    } else if (item.qrType === 'location') {
-      const loc = item.payload.replace('https://maps.google.com/?q=', '');
-      setLocationStr(decodeURIComponent(loc));
-    }
-  };
-
   const updateContact = (key: keyof typeof contact, val: string) => {
     setContact(prev => ({ ...prev, [key]: val }));
   };
@@ -315,7 +301,6 @@ export default function QrCodeGeneratorPage() {
       <ActivityModal
         isOpen={activityModalOpen}
         onClose={() => setActivityModalOpen(false)}
-        onSelectQr={handleLoadFromHistory}
       />
 
       {/* Auth Loading Guard */}
