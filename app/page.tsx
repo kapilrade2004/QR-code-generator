@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { 
   Link as LinkIcon, FileText, User, File, AppWindow, MessageSquare, Mail, Phone, Share2, 
-  Download, Copy, Palette, CheckCircle, Volume2, MapPin, UploadCloud
+  Download, Copy, Palette, CheckCircle, Volume2, MapPin, UploadCloud, AlertTriangle, 
+  Sparkles, Check, Bookmark, Calendar, Clock, Layers
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import AuthModal from '@/components/AuthModal';
@@ -28,13 +29,38 @@ export default function QrCodeGeneratorPage() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [activityModalOpen, setActivityModalOpen] = useState(false);
+  
+  // Warnings and Feedback states
+  const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  const [activeTab, setActiveTab] = useState('url');
   const [copied, setCopied] = useState(false);
+
+  // Customization
+  const [qrColor, setQrColor] = useState('#0f172a');
+  const [activeTab, setActiveTab] = useState('url');
   const qrRef = useRef<HTMLDivElement>(null);
 
-  // Fetch logged in user on mount - Enforce login first
+  // Form states
+  const [url, setUrl] = useState('');
+  const [text, setText] = useState('');
+  const [pdfName, setPdfName] = useState('');
+  const [pdfUrl, setPdfUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  
+  const [contact, setContact] = useState({
+    prefix: '', firstName: '', lastName: '', org: '', title: '', email: '', 
+    mobile: '', homePhone: '', fax: '', street: '', city: '', state: '', 
+    postcode: '', country: '', website: ''
+  });
+
+  const [appUrls, setAppUrls] = useState({ android: '', ios: '', fallback: '' });
+  const [locationStr, setLocationStr] = useState('');
+  const [smsData, setSmsData] = useState({ phone: '', message: '' });
+  const [emailData, setEmailData] = useState({ email: '', subject: '', body: '' });
+  const [phoneNum, setPhoneNum] = useState('');
+  const [socialUrl, setSocialUrl] = useState('');
+
+  // Fetch logged in user on mount
   useEffect(() => {
     fetch('/api/auth/me')
       .then(res => res.json())
@@ -70,6 +96,66 @@ export default function QrCodeGeneratorPage() {
     }
   };
 
+  // Helper to test if QR content is blank
+  const isQrBlank = (): boolean => {
+    switch (activeTab) {
+      case 'url':
+        return !url.trim();
+      case 'plain-text':
+        return !text.trim();
+      case 'pdf':
+        return !pdfUrl.trim();
+      case 'contact':
+        return !contact.firstName.trim() && !contact.mobile.trim() && !contact.email.trim();
+      case 'app':
+        return !appUrls.android.trim() && !appUrls.ios.trim() && !appUrls.fallback.trim();
+      case 'location':
+        return !locationStr.trim();
+      case 'sms':
+        return !smsData.phone.trim();
+      case 'email':
+        return !emailData.email.trim();
+      case 'phone':
+        return !phoneNum.trim();
+      case 'social':
+        return !socialUrl.trim();
+      default:
+        return !url.trim();
+    }
+  };
+
+  // Compute payload value
+  const getPayload = (): string => {
+    switch (activeTab) {
+      case 'url':
+        return url.trim() || 'https://example.com';
+      case 'plain-text':
+        return text.trim() || 'Your text here';
+      case 'pdf':
+        return pdfUrl.trim() || 'https://example.com/sample.pdf';
+      case 'contact':
+        if (!contact.firstName.trim() && !contact.mobile.trim()) return 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD';
+        return `BEGIN:VCARD\nVERSION:3.0\nN:${contact.lastName};${contact.firstName};;${contact.prefix};\nFN:${contact.prefix} ${contact.firstName} ${contact.lastName}\nORG:${contact.org}\nTITLE:${contact.title}\nTEL;TYPE=CELL:${contact.mobile}\nTEL;TYPE=HOME:${contact.homePhone}\nTEL;TYPE=FAX:${contact.fax}\nEMAIL:${contact.email}\nADR;TYPE=WORK:;;${contact.street};${contact.city};${contact.state};${contact.postcode};${contact.country}\nURL:${contact.website}\nEND:VCARD`;
+      case 'app':
+        return appUrls.fallback.trim() || appUrls.android.trim() || appUrls.ios.trim() || 'https://example.com';
+      case 'location':
+        return locationStr.trim() ? `https://maps.google.com/?q=${encodeURIComponent(locationStr.trim())}` : 'https://maps.google.com/';
+      case 'sms':
+        return smsData.phone.trim() ? `SMSTO:${smsData.phone.trim()}:${smsData.message}` : '';
+      case 'email':
+        return emailData.email.trim() ? `mailto:${emailData.email.trim()}?subject=${encodeURIComponent(emailData.subject)}&body=${encodeURIComponent(emailData.body)}` : '';
+      case 'phone':
+        return phoneNum.trim() ? `tel:${phoneNum.trim()}` : '';
+      case 'social':
+        return socialUrl.trim() || '';
+      default:
+        return url.trim() || 'https://example.com';
+    }
+  };
+
+  const qrValue = getPayload();
+
+  // Log action (action: 'DOWNLOADED' | 'COPIED' | 'GENERATED')
   const logQrAction = async (action: 'GENERATED' | 'DOWNLOADED' | 'COPIED', payloadValue: string) => {
     if (!user) return;
     try {
@@ -79,7 +165,7 @@ export default function QrCodeGeneratorPage() {
         body: JSON.stringify({
           qrType: activeTab,
           payload: payloadValue,
-          title: `${activeTab.toUpperCase()} QR`,
+          title: `${activeTab.toUpperCase()} QR Code`,
           action
         })
       });
@@ -88,48 +174,40 @@ export default function QrCodeGeneratorPage() {
     }
   };
 
-  // Form states
-  const [url, setUrl] = useState('');
-  const [text, setText] = useState('');
-  const [pdfName, setPdfName] = useState('');
-  const [pdfUrl, setPdfUrl] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  
-  const [contact, setContact] = useState({
-    prefix: '', firstName: '', lastName: '', org: '', title: '', email: '', 
-    mobile: '', homePhone: '', fax: '', street: '', city: '', state: '', 
-    postcode: '', country: '', website: ''
-  });
+  const showWarning = (msg: string) => {
+    setWarningMessage(msg);
+    setTimeout(() => setWarningMessage(null), 4000);
+  };
 
-  const [appUrls, setAppUrls] = useState({ android: '', ios: '', fallback: '' });
-  const [locationStr, setLocationStr] = useState('');
+  // User Save Handler with Blank Validation
+  const handleSave = async () => {
+    if (!user) {
+      setAuthModalOpen(true);
+      return;
+    }
 
-  // Determine QR Value
-  let qrValue = 'https://example.com';
-  if (activeTab === 'url') {
-    qrValue = url || 'https://example.com';
-  } else if (activeTab === 'plain-text') {
-    qrValue = text || 'Your text here';
-  } else if (activeTab === 'contact') {
-    const vcard = `BEGIN:VCARD\nVERSION:3.0\nN:${contact.lastName};${contact.firstName};;${contact.prefix};\nFN:${contact.prefix} ${contact.firstName} ${contact.lastName}\nORG:${contact.org}\nTITLE:${contact.title}\nTEL;TYPE=CELL:${contact.mobile}\nTEL;TYPE=HOME:${contact.homePhone}\nTEL;TYPE=FAX:${contact.fax}\nEMAIL:${contact.email}\nADR;TYPE=WORK:;;${contact.street};${contact.city};${contact.state};${contact.postcode};${contact.country}\nURL:${contact.website}\nEND:VCARD`;
-    qrValue = contact.firstName ? vcard : 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD';
-  } else if (activeTab === 'app') {
-    qrValue = appUrls.fallback || appUrls.android || appUrls.ios || 'https://example.com';
-  } else if (activeTab === 'location') {
-    qrValue = locationStr ? `https://maps.google.com/?q=${encodeURIComponent(locationStr)}` : 'https://maps.google.com/';
-  } else if (activeTab === 'pdf') {
-    qrValue = pdfUrl || 'https://example.com/sample.pdf';
-  } else {
-    // Fallback for others
-    qrValue = url || 'https://example.com';
-  }
+    // CHECK IF BLANK
+    if (isQrBlank()) {
+      showWarning("⚠️ Cannot save blank QR code! Please enter the required details first.");
+      return;
+    }
+
+    await logQrAction('DOWNLOADED', qrValue); // Save explicitly as verified asset
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2500);
+  };
 
   const handleDownload = () => {
+    if (isQrBlank()) {
+      showWarning("⚠️ Cannot download blank QR code! Please enter content first.");
+      return;
+    }
+
     const canvas = qrRef.current?.querySelector('canvas');
     if (canvas) {
       const u = canvas.toDataURL('image/png');
       const a = document.createElement('a');
-      a.download = 'qrcode.png';
+      a.download = `krisha-crm-${activeTab}-qr.png`;
       a.href = u;
       a.click();
       logQrAction('DOWNLOADED', qrValue);
@@ -137,6 +215,11 @@ export default function QrCodeGeneratorPage() {
   };
 
   const handleCopy = async () => {
+    if (isQrBlank()) {
+      showWarning("⚠️ Cannot copy blank QR code! Please enter content first.");
+      return;
+    }
+
     const canvas = qrRef.current?.querySelector('canvas');
     if (canvas) {
       canvas.toBlob(async (blob) => {
@@ -154,16 +237,6 @@ export default function QrCodeGeneratorPage() {
         }
       });
     }
-  };
-
-  const handleSave = async () => {
-    if (!user) {
-      setAuthModalOpen(true);
-      return;
-    }
-    await logQrAction('GENERATED', qrValue);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
   };
 
   const handleLoadFromHistory = (item: QrLogItem) => {
@@ -202,8 +275,6 @@ export default function QrCodeGeneratorPage() {
       });
       const data = await res.json();
       if (data?.data?.url) {
-        // tmpfiles returns e.g. https://tmpfiles.org/12345/filename.pdf
-        // the direct download link is https://tmpfiles.org/dl/12345/filename.pdf
         const directUrl = data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
         setPdfUrl(directUrl);
       }
@@ -215,7 +286,7 @@ export default function QrCodeGeneratorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50/70 flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900">
       <Navbar
         user={user}
         onOpenAuth={() => setAuthModalOpen(true)}
@@ -247,334 +318,356 @@ export default function QrCodeGeneratorPage() {
         onSelectQr={handleLoadFromHistory}
       />
 
-      {/* If loading authentication status */}
+      {/* Auth Loading Guard */}
       {authLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh]">
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-slate-500 text-sm font-medium">Checking authentication...</p>
+          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-slate-600 text-sm font-semibold">Connecting to Krisha CRM...</p>
         </div>
       ) : !user ? (
-        /* If user is not logged in - Restrict screen */
+        /* Guest restriction */
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 font-bold text-2xl">
-              QR
+          <div className="max-w-md bg-white border border-slate-200/90 rounded-3xl p-8 shadow-xl">
+            <div className="w-16 h-16 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 font-black text-2xl shadow-md shadow-emerald-500/20">
+              K
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">Login Required</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-2">Krisha CRM Sign In</h2>
             <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-              Please sign in or create an account to access the QR Code Generator and tracking tools.
+              Please sign in or create an account to access the enterprise QR Code Studio, activity tracking, and analytics.
             </p>
             <button
               onClick={() => setAuthModalOpen(true)}
-              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/25 transition cursor-pointer"
             >
               Sign In / Register
             </button>
           </div>
         </div>
       ) : (
-        /* When logged in - Allow using the service */
+        /* Main Workspace */
         <main className="p-4 md:p-8 flex-1 flex items-start justify-center overflow-auto">
-        <div className="max-w-6xl w-full bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-2xl p-6 md:p-8 flex flex-col md:flex-row gap-8">
-          
-          {/* Left Side (Controls) */}
-          <div className="flex-1 flex flex-col space-y-8 min-w-0">
-          
-          {/* Tabs */}
-          <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">
-            {tabs.map(t => {
-              const Icon = t.icon;
-              const isActive = activeTab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id)}
-                  className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl min-w-[72px] transition-all
-                    ${isActive ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
+          <div className="max-w-6xl w-full flex flex-col gap-4">
+            
+            {/* Warning Banner when attempting to save/export blank QR */}
+            {warningMessage && (
+              <div className="p-4 bg-amber-50 border-2 border-amber-300/80 text-amber-900 rounded-2xl text-sm font-semibold flex items-center gap-3 shadow-md animate-in fade-in slide-in-from-top duration-200">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span className="flex-1">{warningMessage}</span>
+                <button 
+                  onClick={() => setWarningMessage(null)}
+                  className="text-xs bg-amber-200/80 hover:bg-amber-300 text-amber-900 px-3 py-1 rounded-lg transition"
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-[10px] font-bold tracking-wide uppercase">{t.label}</span>
+                  Dismiss
                 </button>
-              );
-            })}
-          </div>
-
-          <div className="flex-1 overflow-auto pr-2 custom-scrollbar">
-            
-            {/* --- URL TAB --- */}
-            {activeTab === 'url' && (
-              <div className="space-y-4">
-                <h2 className="text-slate-800 text-2xl font-bold">Redirect to an existing web URL</h2>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-full px-6 py-4 outline-none focus:ring-4 focus:ring-emerald-500/20 text-lg font-medium shadow-inner"
-                    placeholder="Enter URL"
-                  />
-                  <Volume2 className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 cursor-pointer hover:text-slate-600" />
-                </div>
-                <p className="text-slate-500 text-sm pl-2">Try something like <span className="text-emerald-400">https://example.com/</span></p>
               </div>
             )}
 
-            {/* --- PDF TAB --- */}
-            {activeTab === 'pdf' && (
-              <div className="space-y-4">
-                <h2 className="text-slate-800 text-2xl font-bold">Upload a PDF document</h2>
-                <label className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  <UploadCloud className="w-10 h-10 text-slate-500 group-hover:text-emerald-400 mb-2 transition-colors" />
-                  <span className="text-slate-800 font-medium">{isUploading ? 'Uploading securely...' : 'Click to upload PDF'}</span>
-                  <span className="text-slate-500 text-sm mt-1">Maximum size: 10MB</span>
-                  <input 
-                    type="file" 
-                    accept="application/pdf" 
-                    className="hidden" 
-                    onChange={handlePdfUpload} 
-                    disabled={isUploading}
-                  />
-                </label>
-                {pdfName && <p className="text-emerald-600 text-sm pl-2 font-medium">Selected: {pdfName} {isUploading && '(Uploading...)'}</p>}
-                {pdfUrl && <p className="text-emerald-300 text-xs pl-2 font-medium break-all">Live Link: <a href={pdfUrl} target="_blank" className="underline hover:text-slate-800">{pdfUrl}</a></p>}
-              </div>
-            )}
-
-            {/* --- CONTACT TAB --- */}
-            {activeTab === 'contact' && (
-              <div className="space-y-6">
-                <h2 className="text-slate-800 text-2xl font-bold mb-6">Share contact details easily</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                  {/* Left Column */}
-                  <div className="space-y-6">
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Prefix</label>
-                      <input type="text" value={contact.prefix} onChange={e => updateContact('prefix', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Last Name</label>
-                      <input type="text" value={contact.lastName} onChange={e => updateContact('lastName', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Title</label>
-                      <input type="text" value={contact.title} onChange={e => updateContact('title', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Mobile</label>
-                      <input type="tel" value={contact.mobile} onChange={e => updateContact('mobile', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Fax</label>
-                      <input type="tel" value={contact.fax} onChange={e => updateContact('fax', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">City</label>
-                      <input type="text" value={contact.city} onChange={e => updateContact('city', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Postcode</label>
-                      <input type="text" value={contact.postcode} onChange={e => updateContact('postcode', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Website/URL/Social</label>
-                      <input type="url" value={contact.website} onChange={e => updateContact('website', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                  </div>
-
-                  {/* Right Column */}
-                  <div className="space-y-6">
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">First Name</label>
-                      <input type="text" value={contact.firstName} onChange={e => updateContact('firstName', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Organization</label>
-                      <input type="text" value={contact.org} onChange={e => updateContact('org', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Email</label>
-                      <input type="email" value={contact.email} onChange={e => updateContact('email', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Home Phone</label>
-                      <input type="tel" value={contact.homePhone} onChange={e => updateContact('homePhone', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Street</label>
-                      <input type="text" value={contact.street} onChange={e => updateContact('street', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">State/Region</label>
-                      <input type="text" value={contact.state} onChange={e => updateContact('state', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                    <div>
-                      <label className="text-slate-700 text-sm font-semibold mb-1 block">Country</label>
-                      <input type="text" value={contact.country} onChange={e => updateContact('country', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-1" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* --- PLAIN TEXT TAB --- */}
-            {activeTab === 'plain-text' && (
-              <div className="space-y-4">
-                <h2 className="text-slate-800 text-2xl font-bold">Display a short message</h2>
-                <label className="text-slate-800 font-semibold block mt-4">Add message</label>
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-emerald-500/20 text-lg font-medium shadow-inner min-h-[160px] resize-none"
-                  placeholder="Enter text here"
-                />
-              </div>
-            )}
-
-            {/* --- APP TAB --- */}
-            {activeTab === 'app' && (
-              <div className="space-y-6">
-                <h2 className="text-slate-800 text-2xl font-bold">Redirect to app download based on the device OS</h2>
-                <p className="text-slate-500 text-sm"><span className="text-red-400">*</span> Indicates required field</p>
+            <div className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-xl p-6 md:p-8 flex flex-col md:flex-row gap-8">
+              
+              {/* Left Side (Controls) */}
+              <div className="flex-1 flex flex-col space-y-6 min-w-0">
                 
-                <div className="space-y-6 mt-4">
+                {/* Header Title */}
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div>
-                    <label className="text-slate-700 font-semibold block text-lg mb-1">URL for Android</label>
-                    <input type="url" value={appUrls.android} onChange={e => updateApp('android', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-2 text-lg" />
-                    <p className="text-slate-500 text-xs mt-1">e.g. https://play.google.com/store/apps/details?id=com.google.android.apps.maps</p>
-                  </div>
-                  <div>
-                    <label className="text-slate-700 font-semibold block text-lg mb-1">URL for iOS</label>
-                    <input type="url" value={appUrls.ios} onChange={e => updateApp('ios', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-2 text-lg" />
-                    <p className="text-slate-500 text-xs mt-1">e.g. https://apps.apple.com/us/app/google-maps/id585027354</p>
-                  </div>
-                  <div>
-                    <label className="text-slate-700 font-semibold block text-lg mb-1">URL for other devices <span className="text-red-400">*</span></label>
-                    <input type="url" value={appUrls.fallback} onChange={e => updateApp('fallback', e.target.value)} className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-2 text-lg" />
-                    <p className="text-slate-500 text-xs mt-1">e.g. https://maps.google.com</p>
+                    <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                      <span>QR Code Studio</span>
+                      <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Krisha CRM
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">Select a data type, enter details, and generate your live QR code.</p>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* --- LOCATION TAB --- */}
-            {activeTab === 'location' && (
-              <div className="space-y-4">
-                <h2 className="text-slate-800 text-2xl font-bold">Show a location on Google Maps</h2>
-                <label className="text-slate-700 font-semibold block text-lg mb-1 mt-6">Search on Google Maps</label>
-                <input
-                  type="text"
-                  value={locationStr}
-                  onChange={(e) => setLocationStr(e.target.value)}
-                  className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-2 text-lg mb-4"
-                  placeholder="Try searching for a landmark, street, or address"
-                />
-                <div className="w-full h-64 bg-slate-200 rounded-xl overflow-hidden relative">
-                  <div className="absolute inset-0 bg-[url('https://maps.googleapis.com/maps/api/staticmap?center=Manhattan,NY&zoom=13&size=600x300&maptype=roadmap')] bg-cover bg-center opacity-50 mix-blend-luminosity"></div>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <MapPin className="w-8 h-8 text-red-500 drop-shadow-lg" />
-                  </div>
+                {/* Tabs */}
+                <div className="flex flex-wrap gap-2 pb-2">
+                  {tabs.map(t => {
+                    const Icon = t.icon;
+                    const isActive = activeTab === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setActiveTab(t.id);
+                          setWarningMessage(null);
+                        }}
+                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl min-w-[76px] transition-all cursor-pointer
+                          ${isActive 
+                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 scale-102' 
+                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60'}`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="text-[10px] font-extrabold tracking-wide uppercase">{t.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Dynamic Tab Body */}
+                <div className="flex-1 overflow-auto pr-1">
+                  
+                  {/* --- URL TAB --- */}
+                  {activeTab === 'url' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-slate-800 text-sm font-bold block">Website / Destination URL</label>
+                        <span className="text-[11px] text-emerald-600 font-semibold">Supports https://</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="url"
+                          value={url}
+                          onChange={(e) => {
+                            setUrl(e.target.value);
+                            setWarningMessage(null);
+                          }}
+                          className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-3.5 outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 text-base font-medium transition"
+                          placeholder="e.g. https://yourcompany.com"
+                        />
+                      </div>
+                      <p className="text-slate-400 text-xs pl-1">
+                        When scanned, users will immediately open this webpage on their mobile browser.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* --- PLAIN TEXT TAB --- */}
+                  {activeTab === 'plain-text' && (
+                    <div className="space-y-4">
+                      <label className="text-slate-800 text-sm font-bold block">Message / Raw Text</label>
+                      <textarea
+                        value={text}
+                        onChange={(e) => {
+                          setText(e.target.value);
+                          setWarningMessage(null);
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-4 outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 text-base font-medium shadow-inner min-h-[160px] resize-none"
+                        placeholder="Type any message, serial number, or note..."
+                      />
+                    </div>
+                  )}
+
+                  {/* --- PDF TAB --- */}
+                  {activeTab === 'pdf' && (
+                    <div className="space-y-4">
+                      <label className="text-slate-800 text-sm font-bold block">Upload PDF Document</label>
+                      <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50/50 transition relative">
+                        <UploadCloud className="w-10 h-10 text-emerald-600 mb-2" />
+                        <span className="text-sm font-bold text-slate-700">Click to upload your PDF</span>
+                        <span className="text-xs text-slate-400 mt-1">Directly hosts and shares your catalog, menu, or brochure</span>
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          onChange={handlePdfUpload}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                      </div>
+                      {isUploading && <p className="text-xs text-emerald-600 font-bold animate-pulse">Uploading file...</p>}
+                      {pdfName && <p className="text-xs text-slate-600 font-semibold">Attached: {pdfName}</p>}
+                    </div>
+                  )}
+
+                  {/* --- CONTACT TAB --- */}
+                  {activeTab === 'contact' && (
+                    <div className="space-y-4">
+                      <label className="text-slate-800 text-sm font-bold block">vCard Contact Card</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input 
+                          type="text" 
+                          placeholder="First Name *" 
+                          value={contact.firstName} 
+                          onChange={e => updateContact('firstName', e.target.value)} 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                        />
+                        <input 
+                          type="text" 
+                          placeholder="Last Name" 
+                          value={contact.lastName} 
+                          onChange={e => updateContact('lastName', e.target.value)} 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                        />
+                        <input 
+                          type="tel" 
+                          placeholder="Mobile Phone *" 
+                          value={contact.mobile} 
+                          onChange={e => updateContact('mobile', e.target.value)} 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                        />
+                        <input 
+                          type="email" 
+                          placeholder="Email Address" 
+                          value={contact.email} 
+                          onChange={e => updateContact('email', e.target.value)} 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                        />
+                        <input 
+                          type="text" 
+                          placeholder="Organization / Company" 
+                          value={contact.org} 
+                          onChange={e => updateContact('org', e.target.value)} 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500 sm:col-span-2" 
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* --- LOCATION TAB --- */}
+                  {activeTab === 'location' && (
+                    <div className="space-y-4">
+                      <label className="text-slate-800 text-sm font-bold block">Google Maps Location</label>
+                      <input
+                        type="text"
+                        value={locationStr}
+                        onChange={(e) => setLocationStr(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-3.5 outline-none focus:border-emerald-500 text-sm"
+                        placeholder="Search landmark, address, or city..."
+                      />
+                    </div>
+                  )}
+
+                  {/* --- APP TAB --- */}
+                  {activeTab === 'app' && (
+                    <div className="space-y-3">
+                      <label className="text-slate-800 text-sm font-bold block">App Store & Play Store Redirects</label>
+                      <input 
+                        type="url" 
+                        placeholder="Fallback URL *" 
+                        value={appUrls.fallback} 
+                        onChange={e => updateApp('fallback', e.target.value)} 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                      />
+                      <input 
+                        type="url" 
+                        placeholder="Google Play Store URL" 
+                        value={appUrls.android} 
+                        onChange={e => updateApp('android', e.target.value)} 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                      />
+                      <input 
+                        type="url" 
+                        placeholder="Apple App Store URL" 
+                        value={appUrls.ios} 
+                        onChange={e => updateApp('ios', e.target.value)} 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                      />
+                    </div>
+                  )}
+
+                  {/* --- OTHER TABS (SMS, EMAIL, PHONE, SOCIAL) --- */}
+                  {!['url', 'pdf', 'contact', 'plain-text', 'app', 'location'].includes(activeTab) && (
+                    <div className="space-y-4">
+                      <label className="text-slate-800 text-sm font-bold block capitalize">{activeTab} Input</label>
+                      <input
+                        type="text"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-3.5 outline-none focus:border-emerald-500 text-sm"
+                        placeholder={`Enter ${activeTab} data...`}
+                      />
+                    </div>
+                  )}
+
+                </div>
+
+                {/* Krisha CRM Security Banner */}
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    <span>Auto-scanned & safe QR generation</span>
+                  </span>
+                  <span className="font-bold text-slate-700">Krisha CRM v2.4</span>
                 </div>
               </div>
-            )}
 
-            {/* Default Catch-all for remaining unstyled tabs */}
-            {!['url', 'pdf', 'contact', 'plain-text', 'app', 'location'].includes(activeTab) && (
-              <div className="space-y-4">
-                <h2 className="text-slate-800 text-2xl font-bold capitalize">{activeTab} Details</h2>
-                <input
-                  type="text"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="w-full bg-transparent border-b border-slate-300 text-slate-800 outline-none focus:border-emerald-500 py-2 text-lg"
-                  placeholder={`Enter ${activeTab} details...`}
-                />
+              {/* Right Side (QR Preview & Studio Controls) */}
+              <div className="w-full md:w-[340px] shrink-0 flex flex-col gap-4">
+                
+                {/* QR Canvas Card */}
+                <div className="bg-gradient-to-b from-slate-50 to-white rounded-3xl p-6 flex flex-col items-center justify-center border border-slate-200/90 shadow-sm relative min-h-[340px]">
+                  
+                  {/* Watermark/Branding */}
+                  <div className="text-center mb-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Krisha CRM • Verified
+                    </span>
+                  </div>
+
+                  <div ref={qrRef} className="p-4 bg-white rounded-2xl shadow-md border border-slate-100">
+                    <QRCodeCanvas 
+                      value={qrValue} 
+                      size={210}
+                      level="H"
+                      includeMargin={false}
+                      fgColor={qrColor}
+                    />
+                  </div>
+                  
+                  {/* Palette Selector */}
+                  <div className="flex items-center gap-2 mt-4">
+                    {[
+                      { color: '#0f172a', title: 'Slate Dark' },
+                      { color: '#059669', title: 'Emerald Green' },
+                      { color: '#2563eb', title: 'Ocean Blue' },
+                      { color: '#7c3aed', title: 'Royal Purple' },
+                      { color: '#dc2626', title: 'Crimson Red' }
+                    ].map(c => (
+                      <button
+                        key={c.color}
+                        onClick={() => setQrColor(c.color)}
+                        title={c.title}
+                        className={`w-6 h-6 rounded-full transition-transform cursor-pointer ${qrColor === c.color ? 'scale-125 ring-2 ring-emerald-500 ring-offset-2' : 'hover:scale-110'}`}
+                        style={{ backgroundColor: c.color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <button 
+                    onClick={handleSave}
+                    className={`flex-1 py-3 px-4 font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs text-sm ${
+                      saveSuccess 
+                        ? 'bg-emerald-600 text-white shadow-md' 
+                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                    }`}
+                  >
+                    {saveSuccess ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Saved to QRs!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="w-4 h-4 text-emerald-600" />
+                        <span>Save QR</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button 
+                    onClick={handleDownload} 
+                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl flex items-center justify-center transition-colors cursor-pointer border border-slate-200" 
+                    title="Download High-Res PNG"
+                  >
+                    <Download className="w-5 h-5" />
+                  </button>
+
+                  <button 
+                    onClick={handleCopy} 
+                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl flex items-center justify-center transition-colors relative cursor-pointer border border-slate-200" 
+                    title="Copy QR to Clipboard"
+                  >
+                    {copied ? <CheckCircle className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
+                  </button>
+                </div>
+
               </div>
-            )}
 
-          </div>
-
-          <div className="flex gap-8 mt-auto pt-6 border-t border-slate-700/50">
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <div className="relative">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
-                <div className="w-10 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-              </div>
-              <span className="text-sm font-semibold text-slate-800 group-hover:text-emerald-400 transition-colors">Track your scans ✨</span>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <div className="relative">
-                <input type="checkbox" className="sr-only peer" />
-                <div className="w-10 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-              </div>
-              <span className="text-sm font-semibold text-slate-800 group-hover:text-emerald-400 transition-colors">Remove watermark ✨</span>
-            </label>
-          </div>
-        </div>
-
-        {/* Right Side (QR Preview) */}
-        <div className="w-full md:w-[340px] shrink-0 flex flex-col gap-4">
-          <div className="flex justify-end">
-            <span className="text-xs text-slate-500">
-              To enable tracking, <a href="#" className="text-slate-800 underline hover:text-emerald-600">create a Dynamic QR Code</a>
-            </span>
-          </div>
-
-          <div className="bg-white rounded-3xl p-6 flex flex-col items-center justify-center shadow-lg relative min-h-[340px]">
-            <div ref={qrRef} className="p-4 bg-white rounded-2xl">
-              <QRCodeCanvas 
-                value={qrValue} 
-                size={220}
-                level="H"
-                includeMargin={false}
-                fgColor="#0f172a"
-              />
-            </div>
-            
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2">
-               <div className="w-10 h-10 border-2 border-emerald-500 rounded-lg p-1 bg-white cursor-pointer hover:scale-105 transition-transform flex items-center justify-center"><QRCodeCanvas value="1" size={24} level="L" fgColor="#0f172a"/></div>
-               <div className="w-10 h-10 border border-slate-200 rounded-lg p-1 bg-white cursor-pointer hover:scale-105 transition-transform flex items-center justify-center"><QRCodeCanvas value="2" size={24} level="L" fgColor="#2563eb"/></div>
-               <div className="w-10 h-10 border border-slate-200 rounded-lg p-1 bg-white cursor-pointer hover:scale-105 transition-transform flex items-center justify-center"><QRCodeCanvas value="3" size={24} level="L" fgColor="#ef4444"/></div>
             </div>
           </div>
-
-          {activeTab === 'location' ? (
-            <div className="flex flex-col gap-2">
-              <button className="w-full bg-[#5d9b3d] hover:bg-[#4d8232] text-white font-bold py-3 rounded-lg flex items-center justify-center transition-colors">
-                Next
-              </button>
-              <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg flex items-start gap-2 border border-blue-100 mt-2">
-                <span className="font-bold border border-blue-800 rounded-full w-4 h-4 flex items-center justify-center shrink-0">i</span>
-                <span>Your QR Code isn't ready yet. Add content and click <b>Next</b> to generate it.</span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-2 h-12">
-              <button 
-                onClick={handleSave}
-                className={`flex-1 font-bold rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  saveSuccess 
-                    ? 'bg-emerald-600 text-white shadow-md' 
-                    : 'bg-slate-200 hover:bg-white text-slate-800'
-                }`}
-              >
-                {saveSuccess ? 'Saved to Logs!' : 'Save'}
-              </button>
-              <button onClick={handleDownload} className="w-12 bg-slate-200 hover:bg-white text-slate-600 rounded-xl flex items-center justify-center transition-colors cursor-pointer" title="Download">
-                <Download className="w-5 h-5" />
-              </button>
-              <button onClick={handleCopy} className="w-12 bg-slate-200 hover:bg-white text-slate-600 rounded-xl flex items-center justify-center transition-colors relative cursor-pointer" title="Copy to Clipboard">
-                {copied ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5" />}
-              </button>
-              <button className="w-12 bg-slate-200 hover:bg-white text-slate-600 rounded-xl flex items-center justify-center transition-colors cursor-pointer" title="Customize">
-                <Palette className="w-5 h-5" />
-              </button>
-            </div>
-          )}
-        </div>
-
-      </div>
-      </main>
+        </main>
       )}
     </div>
   );

@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
 import { 
-  ArrowLeft, QrCode, Search, Filter, RefreshCw, Calendar, 
-  ExternalLink, Copy, Check, Download, AlertCircle, Sparkles, User, FileText, AppWindow, MessageSquare, Mail, Phone, Share2, MapPin, File
+  ArrowLeft, QrCode, Search, Filter, RefreshCw, Calendar, Clock,
+  ExternalLink, Copy, Check, Download, AlertCircle, Sparkles, User, FileText, AppWindow, MessageSquare, Mail, Phone, Share2, MapPin, File, ShieldCheck
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import AuthModal from '@/components/AuthModal';
@@ -61,15 +61,18 @@ export default function MyQrCodesPage() {
   }, []);
 
   const fetchLogs = async () => {
+    if (!user) return;
     setLoading(true);
     try {
       const res = await fetch('/api/qr/logs');
       if (res.ok) {
         const data = await res.json();
-        setLogs(data.logs || []);
+        // Exclude raw un-saved GENERATED events, keep clean saved/downloaded/copied list
+        const filtered = (data.logs || []).filter((l: QrLogItem) => l.action !== 'GENERATED');
+        setLogs(filtered);
       }
     } catch (err) {
-      console.error('Failed to load QR list', err);
+      console.error('Failed to load user QR logs:', err);
     } finally {
       setLoading(false);
     }
@@ -91,35 +94,43 @@ export default function MyQrCodesPage() {
     }
   };
 
-  const handleCopyText = (id: string, text: string) => {
+  const handleCopyPayload = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleDownloadQr = (id: string, title?: string) => {
-    const canvas = document.getElementById(`qr-canvas-${id}`) as HTMLCanvasElement | null;
+  const handleDownloadQr = (id: string, title: string) => {
+    const container = document.getElementById(`qr-canvas-${id}`);
+    const canvas = container?.querySelector('canvas');
     if (canvas) {
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a');
-      a.download = `${(title || 'qr-code').toLowerCase().replace(/\s+/g, '-')}.png`;
+      a.download = `${title.toLowerCase().replace(/\s+/g, '-')}-qrcode.png`;
       a.href = url;
       a.click();
     }
   };
 
-  const formatDate = (isoStr: string) => {
+  const formatDateTime = (isoStr: string) => {
     try {
       const d = new Date(isoStr);
-      return d.toLocaleDateString(undefined, {
+      if (isNaN(d.getTime())) return { datePart: isoStr, timePart: '' };
+      
+      const datePart = d.toLocaleDateString(undefined, {
+        day: '2-digit',
         month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        year: 'numeric'
       });
+      const timePart = d.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+      return { datePart, timePart };
     } catch {
-      return isoStr;
+      return { datePart: isoStr, timePart: '' };
     }
   };
 
@@ -158,7 +169,7 @@ export default function MyQrCodesPage() {
   }, [logs, selectedType, searchTerm]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-emerald-100 selection:text-emerald-900">
       <Navbar
         user={user}
         onOpenAuth={() => setAuthModalOpen(true)}
@@ -178,229 +189,209 @@ export default function MyQrCodesPage() {
         }}
       />
 
-      {authLoading ? (
-        <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh]">
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-slate-500 text-sm font-medium">Checking authentication...</p>
-        </div>
-      ) : !user ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 font-bold text-2xl">
-              QR
+      {/* Main Container */}
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+        {/* Header and CRM Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-emerald-600 transition"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Generator</span>
+              </Link>
+              <span className="text-slate-300">/</span>
+              <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                Krisha CRM Hub
+              </span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">Login Required</h2>
-            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-              Please sign in to view your saved and generated QR codes.
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              My Saved QR Codes
+            </h1>
+            <p className="text-sm text-slate-500 mt-1 font-medium">
+              Manage your verified QR assets, view real-time creation timestamps, and download vector-ready PNGs.
             </p>
+          </div>
+
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setAuthModalOpen(true)}
-              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+              onClick={fetchLogs}
+              className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition shadow-xs cursor-pointer"
+              title="Refresh QRs"
             >
-              Sign In / Register
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
+            <Link
+              href="/"
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition cursor-pointer"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Generate New QR</span>
+            </Link>
           </div>
         </div>
-      ) : (
-        <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex-1 flex flex-col">
-          {/* Top Bar Navigation */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-            <div>
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/"
-                  className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition shadow-sm"
-                  title="Back to Generator"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </Link>
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                    My Generated QR Codes
-                  </h1>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    View, search, preview, and download every QR code you generated or saved
-                  </p>
-                </div>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-3">
+        {/* Search & Filter Strip */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 mb-8 shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
+          {/* Search Box */}
+          <div className="relative w-full md:w-96">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by title, payload or type..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition text-slate-800"
+            />
+          </div>
+
+          {/* Type Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 custom-scrollbar">
+            <span className="text-xs font-bold text-slate-400 mr-2 flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5" />
+              Filter:
+            </span>
+            {uniqueTypes.map((type) => (
               <button
-                onClick={fetchLogs}
-                disabled={loading}
-                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-sm transition shadow-sm cursor-pointer"
+                key={type}
+                onClick={() => setSelectedType(type)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold uppercase tracking-wider transition cursor-pointer shrink-0 ${
+                  selectedType.toLowerCase() === type.toLowerCase()
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
               >
-                <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
+                {type}
               </button>
-              <Link
-                href="/"
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition shadow-md shadow-emerald-600/20 cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Create New QR</span>
-              </Link>
-            </div>
+            ))}
           </div>
+        </div>
 
-          {/* Stats Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Saved</span>
-              <p className="text-2xl font-black text-slate-800 mt-1">{logs.length}</p>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">QR Types Used</span>
-              <p className="text-2xl font-black text-emerald-600 mt-1">{Math.max(0, uniqueTypes.length - 1)}</p>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">User Account</span>
-              <p className="text-sm font-bold text-slate-800 mt-2 truncate">{user.email}</p>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Storage Sync</span>
-              <p className="text-sm font-semibold text-emerald-600 mt-2 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                MySQL Connected
-              </p>
-            </div>
+        {/* QR List Grid */}
+        {loading && logs.length === 0 ? (
+          <div className="py-24 text-center">
+            <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-sm font-semibold text-slate-500">Loading your QR portfolio...</p>
           </div>
-
-          {/* Search & Filter Bar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="relative w-full md:w-96">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-              <input
-                type="text"
-                placeholder="Search by title, type, or payload..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
-              />
+        ) : filteredLogs.length === 0 ? (
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center max-w-xl mx-auto shadow-xs">
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <QrCode className="w-7 h-7" />
             </div>
-
-            {/* Types filters */}
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-              <Filter className="w-4 h-4 text-slate-400 mr-1 shrink-0" />
-              {uniqueTypes.map(t => (
-                <button
-                  key={t}
-                  onClick={() => setSelectedType(t)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize whitespace-nowrap transition cursor-pointer ${
-                    selectedType.toLowerCase() === t.toLowerCase()
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">No QR Codes Found</h3>
+            <p className="text-xs text-slate-500 mb-6 max-w-sm mx-auto">
+              {searchTerm || selectedType !== 'ALL'
+                ? "No saved QR codes match your filter criteria."
+                : "You haven't saved or downloaded any QR codes yet in Krisha CRM."}
+            </p>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow-md shadow-emerald-600/20"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Create Your First QR</span>
+            </Link>
           </div>
-
-          {/* QR Codes Grid List */}
-          {loading && logs.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200">
-              <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-slate-500 text-sm mt-3">Loading your saved QR codes...</p>
-            </div>
-          ) : filteredLogs.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200 text-center">
-              <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mb-3">
-                <QrCode className="w-7 h-7" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800">No QR codes found</h3>
-              <p className="text-sm text-slate-500 max-w-sm mt-1 mb-6">
-                {searchTerm || selectedType !== 'ALL'
-                  ? 'No QR codes matched your current filter or search criteria.'
-                  : 'You have not saved or generated any QR codes yet. Start creating your first one now!'}
-              </p>
-              <Link
-                href="/"
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl transition shadow-md shadow-emerald-600/20"
-              >
-                Go to Generator
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredLogs.map(item => (
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredLogs.map((log) => {
+              const dt = formatDateTime(log.createdAt);
+              return (
                 <div
-                  key={item.id}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col justify-between"
+                  key={log.id}
+                  className="bg-white border border-slate-200/90 rounded-2xl p-5 hover:shadow-xl hover:border-emerald-300 transition-all duration-300 flex flex-col group relative"
                 >
                   {/* Card Header */}
-                  <div>
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                          {getTypeIcon(item.qrType)}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-slate-900 text-base leading-snug truncate max-w-[180px]">
-                            {item.title || `${item.qrType.toUpperCase()} QR`}
-                          </h3>
-                          <span className="inline-block text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
-                            {item.qrType}
-                          </span>
-                        </div>
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-slate-100 group-hover:bg-emerald-50 transition-colors">
+                        {getTypeIcon(log.qrType)}
                       </div>
-                      <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">
-                        {formatDate(item.createdAt)}
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 truncate max-w-[150px]">
+                          {log.title || `${log.qrType.toUpperCase()} QR`}
+                        </h3>
+                        <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                          {log.qrType}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
+                      {log.action}
+                    </span>
+                  </div>
+
+                  {/* QR Canvas Center */}
+                  <div 
+                    id={`qr-canvas-${log.id}`} 
+                    className="p-4 bg-slate-50/80 rounded-2xl flex items-center justify-center my-2 border border-slate-100"
+                  >
+                    <QRCodeCanvas
+                      value={log.payload}
+                      size={170}
+                      level="H"
+                      includeMargin={false}
+                      fgColor="#0f172a"
+                    />
+                  </div>
+
+                  {/* Payload Details */}
+                  <div className="mt-3 space-y-2">
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <p className="text-[11px] font-mono text-slate-700 break-all line-clamp-2 select-all">
+                        {log.payload}
+                      </p>
+                    </div>
+
+                    {/* Date and Time Audit */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100 font-medium">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        {dt.datePart}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                        <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                        {dt.timePart}
                       </span>
                     </div>
-
-                    {/* QR Preview & Details */}
-                    <div className="flex items-center gap-4 bg-slate-50/70 p-3.5 rounded-xl border border-slate-100 mb-4">
-                      <div className="p-2 bg-white rounded-xl shadow-xs shrink-0 border border-slate-200">
-                        <QRCodeCanvas
-                          id={`qr-canvas-${item.id}`}
-                          value={item.payload}
-                          size={96}
-                          level="M"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                          QR Content
-                        </span>
-                        <p className="text-xs text-slate-700 font-mono break-all line-clamp-3 bg-white p-2 rounded-lg border border-slate-200/60">
-                          {item.payload}
-                        </p>
-                      </div>
-                    </div>
                   </div>
 
-                  {/* Card Actions */}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                    <span className="text-[11px] font-medium text-slate-500">
-                      Action: <strong className="text-slate-700 uppercase">{item.action}</strong>
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleCopyText(item.id, item.payload)}
-                        title="Copy QR Payload"
-                        className="p-2 text-slate-600 hover:text-emerald-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                      >
-                        {copiedId === item.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                      <button
-                        onClick={() => handleDownloadQr(item.id, item.title)}
-                        title="Download QR Image (PNG)"
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 font-semibold text-xs rounded-lg transition cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download</span>
-                      </button>
-                    </div>
+                  {/* Actions Footer */}
+                  <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+                    <button
+                      onClick={() => handleCopyPayload(log.id, log.payload)}
+                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      {copiedId === log.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => handleDownloadQr(log.id, log.title || log.qrType)}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download</span>
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </main>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </main>
     </div>
   );
 }

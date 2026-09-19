@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   X, History, ShieldCheck, QrCode, Calendar, Clock, 
-  ExternalLink, Copy, Check, Smartphone, Globe, RefreshCw, AlertCircle
+  ExternalLink, Copy, Check, Smartphone, Globe, RefreshCw, AlertCircle, Trash2
 } from 'lucide-react';
 
 export interface LoginLogItem {
@@ -51,7 +51,9 @@ export default function ActivityModal({ isOpen, onClose, onSelectQr }: ActivityM
 
       if (qrRes.ok) {
         const data = await qrRes.json();
-        setQrLogs(data.logs || []);
+        // User requested: Remove auto "GENERATED" action from activity logs display, only keep saved/downloaded/copied or explicit items
+        const filtered = (data.logs || []).filter((l: QrLogItem) => l.action !== 'GENERATED');
+        setQrLogs(filtered);
       }
       if (loginRes.ok) {
         const data = await loginRes.json();
@@ -78,43 +80,58 @@ export default function ActivityModal({ isOpen, onClose, onSelectQr }: ActivityM
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const formatDate = (isoStr: string) => {
-    const d = new Date(isoStr);
-    return d.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+  const formatDateTime = (isoStr: string): { datePart: string; timePart: string } => {
+    try {
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return { datePart: isoStr, timePart: '' };
+      
+      const datePart = d.toLocaleDateString(undefined, {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+      const timePart = d.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+      return { datePart, timePart };
+    } catch {
+      return { datePart: isoStr, timePart: '' };
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-emerald-50/40">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
               <History className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-800 text-lg">Activity & Audit Logs</h3>
-              <p className="text-xs text-slate-500">Track all QR generations and account login events</p>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-lg">Activity & Audit Logs</h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                  Krisha CRM
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">Live timeline with precise date, time, and device security audits</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={fetchData}
               title="Refresh logs"
-              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition"
+              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -122,151 +139,174 @@ export default function ActivityModal({ isOpen, onClose, onSelectQr }: ActivityM
         </div>
 
         {/* Tab Selection */}
-        <div className="flex border-b border-slate-200 px-6 bg-white">
+        <div className="flex border-b border-slate-200 px-6 bg-white gap-2">
           <button
             onClick={() => setTab('qr')}
-            className={`flex items-center gap-2 py-3 px-4 font-semibold text-sm border-b-2 transition ${
+            className={`flex items-center gap-2 py-3.5 px-4 font-bold text-sm border-b-2 transition cursor-pointer ${
               tab === 'qr'
-                ? 'border-emerald-600 text-emerald-600'
+                ? 'border-emerald-600 text-emerald-700'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <QrCode className="w-4 h-4" />
-            <span>QR Generations ({qrLogs.length})</span>
+            <span>Saved & Exported QRs ({qrLogs.length})</span>
           </button>
           <button
             onClick={() => setTab('login')}
-            className={`flex items-center gap-2 py-3 px-4 font-semibold text-sm border-b-2 transition ${
+            className={`flex items-center gap-2 py-3.5 px-4 font-bold text-sm border-b-2 transition cursor-pointer ${
               tab === 'login'
-                ? 'border-emerald-600 text-emerald-600'
+                ? 'border-emerald-600 text-emerald-700'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Login History ({loginLogs.length})</span>
+            <span>Login Security Audit ({loginLogs.length})</span>
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-          {tab === 'qr' ? (
-            <div className="space-y-3">
-              {qrLogs.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <QrCode className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">No QR codes generated yet.</p>
-                  <p className="text-xs text-slate-400 mt-1">Generate or download a QR code to see it here.</p>
+        <div className="p-6 overflow-y-auto flex-1 space-y-3 custom-scrollbar bg-slate-50/50">
+          {tab === 'qr' && (
+            qrLogs.length === 0 ? (
+              <div className="text-center py-14 bg-white rounded-2xl border border-slate-200/60 p-8 shadow-xs">
+                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-400">
+                  <QrCode className="w-6 h-6" />
                 </div>
-              ) : (
-                qrLogs.map((log) => (
+                <h4 className="text-slate-800 font-bold text-base mb-1">No Activity Logs Found</h4>
+                <p className="text-slate-500 text-xs max-w-sm mx-auto">
+                  When you download, copy, or save QR codes, each event will be logged here with complete date and timestamps.
+                </p>
+              </div>
+            ) : (
+              qrLogs.map((log) => {
+                const dt = formatDateTime(log.createdAt);
+                return (
                   <div
                     key={log.id}
-                    className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    className="p-4 bg-white rounded-2xl border border-slate-200/80 hover:border-emerald-300 hover:shadow-md transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          {log.qrType}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase bg-slate-100 text-slate-600">
-                          Action: {log.action}
-                        </span>
-                        <span className="text-xs text-slate-400 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatDate(log.createdAt)}
-                        </span>
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs flex items-center justify-center shrink-0 uppercase border border-emerald-200/60">
+                        {log.qrType.slice(0, 3)}
                       </div>
-
-                      <p className="text-xs font-mono text-slate-600 break-all bg-slate-50 p-2 rounded-lg border border-slate-100 mt-1">
-                        {log.payload}
-                      </p>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-sm">{log.title || 'QR Code'}</span>
+                          <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {log.action}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-mono break-all line-clamp-1 max-w-md">
+                          {log.payload}
+                        </p>
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-1 font-medium">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            {dt.datePart}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                            {dt.timePart}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                       <button
                         onClick={() => handleCopyPayload(log.id, log.payload)}
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 transition"
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition cursor-pointer"
                         title="Copy content"
                       >
                         {copiedId === log.id ? (
                           <>
                             <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span className="text-emerald-600 font-semibold">Copied</span>
+                            <span className="text-emerald-700">Copied</span>
                           </>
                         ) : (
                           <>
-                            <Copy className="w-3.5 h-3.5" />
+                            <Copy className="w-3.5 h-3.5 text-slate-500" />
                             <span>Copy</span>
                           </>
                         )}
                       </button>
-
                       {onSelectQr && (
                         <button
                           onClick={() => {
                             onSelectQr(log);
                             onClose();
                           }}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1.5 transition shadow-sm"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition cursor-pointer"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Load in Editor</span>
+                          Load
                         </button>
                       )}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {loginLogs.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <ShieldCheck className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">No login logs found.</p>
+                );
+              })
+            )
+          )}
+
+          {tab === 'login' && (
+            loginLogs.length === 0 ? (
+              <div className="text-center py-14 bg-white rounded-2xl border border-slate-200/60 p-8 shadow-xs">
+                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-400">
+                  <ShieldCheck className="w-6 h-6" />
                 </div>
-              ) : (
-                loginLogs.map((log) => {
-                  const isSuccess = log.status === 'SUCCESS';
-                  return (
-                    <div
-                      key={log.id}
-                      className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4"
-                    >
-                      <div className="space-y-1 min-w-0">
+                <h4 className="text-slate-800 font-bold text-base mb-1">No Login Records</h4>
+                <p className="text-slate-500 text-xs">Security authentication audits will appear here.</p>
+              </div>
+            ) : (
+              loginLogs.map((log) => {
+                const dt = formatDateTime(log.createdAt);
+                const isSuccess = log.status === 'SUCCESS';
+                return (
+                  <div
+                    key={log.id}
+                    className="p-4 bg-white rounded-2xl border border-slate-200/80 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                          isSuccess ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                        }`}
+                      >
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div>
                         <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900">{log.userEmail}</span>
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase ${
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
                               isSuccess
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                : 'bg-red-50 text-red-700 border border-red-100'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
                             }`}
                           >
                             {log.status}
                           </span>
-                          <span className="text-xs font-semibold text-slate-700">{log.userEmail}</span>
-                          <span className="text-xs text-slate-400 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {formatDate(log.createdAt)}
-                          </span>
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 pt-1">
-                          <span className="flex items-center gap-1">
-                            <Globe className="w-3.5 h-3.5 text-slate-400" />
-                            IP: {log.ipAddress || '127.0.0.1'}
-                          </span>
-                          <span className="flex items-center gap-1 truncate max-w-sm" title={log.userAgent}>
-                            <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-                            {log.userAgent || 'Browser session'}
-                          </span>
-                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5 truncate max-w-sm">
+                          {log.userAgent || 'Web Browser'}
+                        </p>
                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold justify-end">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{dt.datePart}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium justify-end mt-0.5">
+                        <Clock className="w-3 h-3" />
+                        <span>{dt.timePart}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )
           )}
         </div>
       </div>
