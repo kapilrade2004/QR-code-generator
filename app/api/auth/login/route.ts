@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import pool, { User } from '@/lib/db';
-import { RowDataPacket } from 'mysql2/promise';
+import { UserModel, User, connectDB } from '@/lib/db';
 import { signToken, COOKIE_NAME, getClientInfo } from '@/lib/services/auth';
 import { createLoginLog } from '@/lib/services/loginLogs';
 
 export async function POST(req: NextRequest) {
   try {
+    await connectDB();
     const { email, password } = await req.json();
     const { ip, userAgent } = getClientInfo(req);
 
@@ -19,12 +19,7 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT id, email, name, passwordHash FROM users WHERE email = ?',
-      [cleanEmail]
-    );
-
-    const user = rows[0] as User | undefined;
+    const user = await UserModel.findOne({ email: cleanEmail }).lean();
 
     if (!user) {
       await createLoginLog({
@@ -89,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (err: unknown) {
-    console.error('Login error in MySQL:', err);
+    console.error('Login error in MongoDB:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

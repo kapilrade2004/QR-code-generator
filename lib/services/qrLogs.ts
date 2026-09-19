@@ -1,5 +1,4 @@
-import pool, { QrActivityLog } from '../db';
-import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import { QrActivityLogModel, UserModel, QrActivityLog, connectDB } from '../db';
 
 export async function createQrActivityLog(data: {
   userId: string;
@@ -10,6 +9,7 @@ export async function createQrActivityLog(data: {
   metadata?: Record<string, unknown>;
   action: 'GENERATED' | 'DOWNLOADED' | 'COPIED';
 }): Promise<QrActivityLog> {
+  await connectDB();
   const log: QrActivityLog = {
     id: 'qr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
     userId: data.userId,
@@ -23,29 +23,18 @@ export async function createQrActivityLog(data: {
   };
 
   try {
-    await pool.execute<ResultSetHeader>(
-      `INSERT INTO qr_activity_logs (id, userId, userEmail, qrType, title, payload, metadata, action, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        log.id,
-        log.userId,
-        log.userEmail,
-        log.qrType,
-        log.title || null,
-        log.payload,
-        JSON.stringify(log.metadata || {}),
-        log.action,
-        log.createdAt
-      ]
-    );
+    await QrActivityLogModel.create(log);
 
     // Update user's total QR count and last generated type
-    await pool.execute<ResultSetHeader>(
-      `UPDATE users SET qrCount = qrCount + 1, lastQrType = ? WHERE id = ?`,
-      [log.qrType, log.userId]
+    await UserModel.updateOne(
+      { id: log.userId },
+      {
+        $inc: { qrCount: 1 },
+        $set: { lastQrType: log.qrType }
+      }
     );
   } catch (err) {
-    console.error('Failed to insert QR activity log into MySQL:', err);
+    console.error('Failed to insert QR activity log into MongoDB:', err);
   }
 
   return log;
@@ -53,16 +42,21 @@ export async function createQrActivityLog(data: {
 
 export async function getQrLogsForUser(userId: string): Promise<QrActivityLog[]> {
   try {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT id, userId, userEmail, qrType, title, payload, metadata, action, createdAt
-       FROM qr_activity_logs
-       WHERE userId = ?
-       ORDER BY createdAt DESC`,
-      [userId]
-    );
-    return rows as QrActivityLog[];
+    await connectDB();
+    const docs = await QrActivityLogModel.find({ userId }).sort({ createdAt: -1 }).lean();
+    return docs.map((d: any) => ({
+      id: d.id,
+      userId: d.userId,
+      userEmail: d.userEmail,
+      qrType: d.qrType,
+      title: d.title,
+      payload: d.payload,
+      metadata: d.metadata,
+      action: d.action,
+      createdAt: d.createdAt
+    }));
   } catch (err) {
-    console.error('Failed to query QR activity logs from MySQL:', err);
+    console.error('Failed to query QR activity logs from MongoDB:', err);
     return [];
   }
 }

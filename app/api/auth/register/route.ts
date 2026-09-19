@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import pool, { User } from '@/lib/db';
-import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import { UserModel, User, connectDB } from '@/lib/db';
 import { signToken, COOKIE_NAME, getClientInfo } from '@/lib/services/auth';
 import { createLoginLog } from '@/lib/services/loginLogs';
 
 export async function POST(req: NextRequest) {
   try {
+    await connectDB();
     const { email, password, name } = await req.json();
 
     if (!email || !password) {
@@ -19,12 +19,8 @@ export async function POST(req: NextRequest) {
     const cleanEmail = email.toLowerCase().trim();
 
     // Check existing
-    const [existingRows] = await pool.execute<RowDataPacket[]>(
-      'SELECT id FROM users WHERE email = ?',
-      [cleanEmail]
-    );
-
-    if (existingRows.length > 0) {
+    const existingUser = await UserModel.findOne({ email: cleanEmail }).lean();
+    if (existingUser) {
       return NextResponse.json(
         { error: 'User already exists with this email' },
         { status: 409 }
@@ -39,13 +35,11 @@ export async function POST(req: NextRequest) {
       email: cleanEmail,
       name: name || cleanEmail.split('@')[0],
       passwordHash,
-      createdAt: new Date().toISOString().slice(0, 19).replace('T', ' ')
+      createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      qrCount: 0
     };
 
-    await pool.execute<ResultSetHeader>(
-      'INSERT INTO users (id, email, name, passwordHash, createdAt) VALUES (?, ?, ?, ?, ?)',
-      [newUser.id, newUser.email, newUser.name || null, newUser.passwordHash, newUser.createdAt]
-    );
+    await UserModel.create(newUser);
 
     const token = signToken({
       userId: newUser.id,
@@ -82,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (err: unknown) {
-    console.error('Registration error in MySQL:', err);
+    console.error('Registration error in MongoDB:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
