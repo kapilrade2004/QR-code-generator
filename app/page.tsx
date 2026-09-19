@@ -307,7 +307,7 @@ export default function QrCodeGeneratorPage() {
       {authLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh]">
           <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-slate-600 text-sm font-semibold">Connecting to Krisha CRM...</p>
+          <p className="mt-4 text-slate-600 text-sm font-semibold">Connecting to QR Studio...</p>
         </div>
       ) : !user ? (
         /* Guest restriction */
