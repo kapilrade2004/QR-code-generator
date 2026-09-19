@@ -18,7 +18,7 @@ export default function Navbar({ user, onOpenAuth, onOpenActivity, onLogout }: N
   return (
     <header className="w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-        {/* Krisha CRM & QR Studio Branding */}
+        {/* QR Studio Branding */}
         <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-3 group">
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-transform">
@@ -27,10 +27,10 @@ export default function Navbar({ user, onOpenAuth, onOpenActivity, onLogout }: N
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-slate-900 text-lg tracking-tight">
-                  Krisha CRM
+                  QR Studio
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  QR Studio PRO
+                  PRO
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
@@ -88,7 +88,7 @@ export default function Navbar({ user, onOpenAuth, onOpenActivity, onLogout }: N
                 className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow-md shadow-emerald-600/25 cursor-pointer"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Sign In to Krisha CRM</span>
+                <span>Sign In to QR Studio</span>
               </button>
             </div>
           )}

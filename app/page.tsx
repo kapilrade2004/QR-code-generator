@@ -207,7 +207,7 @@ export default function QrCodeGeneratorPage() {
     if (canvas) {
       const u = canvas.toDataURL('image/png');
       const a = document.createElement('a');
-      a.download = `krisha-crm-${activeTab}-qr.png`;
+      a.download = `qr-studio-${activeTab}-qr.png`;
       a.href = u;
       a.click();
       logQrAction('DOWNLOADED', qrValue);
@@ -329,9 +329,9 @@ export default function QrCodeGeneratorPage() {
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <div className="max-w-md bg-white border border-slate-200/90 rounded-3xl p-8 shadow-xl">
             <div className="w-16 h-16 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 font-black text-2xl shadow-md shadow-emerald-500/20">
-              K
+              Q
             </div>
-            <h2 className="text-2xl font-black text-slate-900 mb-2">Krisha CRM Sign In</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-2">QR Studio Sign In</h2>
             <p className="text-slate-500 text-sm mb-6 leading-relaxed">
               Please sign in or create an account to access the enterprise QR Code Studio, activity tracking, and analytics.
             </p>
@@ -373,7 +373,7 @@ export default function QrCodeGeneratorPage() {
                     <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                       <span>QR Code Studio</span>
                       <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Krisha CRM
+                        PRO
                       </span>
                     </h2>
                     <p className="text-xs text-slate-500 font-medium mt-0.5">Select a data type, enter details, and generate your live QR code.</p>
@@ -576,7 +576,7 @@ export default function QrCodeGeneratorPage() {
                     <Sparkles className="w-4 h-4 text-emerald-600" />
                     <span>Auto-scanned & safe QR generation</span>
                   </span>
-                  <span className="font-bold text-slate-700">Krisha CRM v2.4</span>
+                  <span className="font-bold text-slate-700">QR Studio PRO</span>
                 </div>
               </div>
 
@@ -589,7 +589,7 @@ export default function QrCodeGeneratorPage() {
                   {/* Watermark/Branding */}
                   <div className="text-center mb-3">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Krisha CRM • Verified
+                      QR Studio • Verified
                     </span>
                   </div>
 

@@ -204,7 +204,7 @@ export default function MyQrCodesPage() {
               </Link>
               <span className="text-slate-300">/</span>
               <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                Krisha CRM Hub
+                QR Studio Hub
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
@@ -284,7 +284,7 @@ export default function MyQrCodesPage() {
             <p className="text-xs text-slate-500 mb-6 max-w-sm mx-auto">
               {searchTerm || selectedType !== 'ALL'
                 ? "No saved QR codes match your filter criteria."
-                : "You haven't saved or downloaded any QR codes yet in Krisha CRM."}
+                : "You haven't saved or downloaded any QR codes yet in QR Studio."}
             </p>
             <Link
               href="/"

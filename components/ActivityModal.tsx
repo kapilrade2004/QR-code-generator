@@ -115,7 +115,7 @@ export default function ActivityModal({ isOpen, onClose, onSelectQr }: ActivityM
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-slate-900 text-lg">Activity & Audit Logs</h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                  Krisha CRM
+                  QR Studio
                 </span>
               </div>
               <p className="text-xs text-slate-500">Live timeline with precise date, time, and device security audits</p>
