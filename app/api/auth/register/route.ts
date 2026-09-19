@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       email: cleanEmail,
       name: name || cleanEmail.split('@')[0],
       passwordHash,
-      createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      createdAt: new Date().toISOString(),
       qrCount: 0
     };
 

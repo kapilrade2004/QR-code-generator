@@ -15,7 +15,7 @@ export async function createLoginLog(data: {
     ipAddress: data.ipAddress,
     userAgent: data.userAgent,
     status: data.status,
-    createdAt: new Date().toISOString().slice(0, 19).replace('T', ' ')
+    createdAt: new Date().toISOString()
   };
 
   try {

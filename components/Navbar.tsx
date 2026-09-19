@@ -1,10 +1,10 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   QrCode, LogIn, LogOut, History, Sparkles, Building2, 
-  ExternalLink, Layers, ShieldCheck 
+  ExternalLink, Layers, ShieldCheck, Calendar, Clock
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -15,6 +15,33 @@ interface NavbarProps {
 }
 
 export default function Navbar({ user, onOpenAuth, onOpenActivity, onLogout }: NavbarProps) {
+  const [currentDateTime, setCurrentDateTime] = useState<{ date: string; time: string }>({
+    date: '',
+    time: ''
+  });
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const date = now.toLocaleDateString(undefined, {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+      const time = now.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+      setCurrentDateTime({ date, time });
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
   return (
     <header className="w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
@@ -42,8 +69,23 @@ export default function Navbar({ user, onOpenAuth, onOpenActivity, onLogout }: N
           </Link>
         </div>
 
-        {/* Action Controls */}
+        {/* Center/Action Controls */}
         <div className="flex items-center gap-3">
+          {/* Live Date & Time Widget */}
+          {currentDateTime.date && (
+            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 bg-slate-50 border border-slate-200/80 rounded-2xl shadow-xs">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span>{currentDateTime.date}</span>
+              </div>
+              <span className="text-slate-300">•</span>
+              <div className="flex items-center gap-1.5 text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200/70">
+                <Clock className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+                <span className="font-mono tracking-tight">{currentDateTime.time}</span>
+              </div>
+            </div>
+          )}
+
           {user ? (
             <>
               <Link

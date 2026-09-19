@@ -49,7 +49,11 @@ export default function ActivityModal({ isOpen, onClose }: ActivityModalProps) {
 
   const formatDateTime = (isoStr: string): { datePart: string; timePart: string } => {
     try {
-      const d = new Date(isoStr);
+      let parseStr = isoStr;
+      if (isoStr && !isoStr.endsWith('Z') && isoStr.includes(' ')) {
+        parseStr = isoStr.replace(' ', 'T') + 'Z';
+      }
+      const d = new Date(parseStr);
       if (isNaN(d.getTime())) return { datePart: isoStr, timePart: '' };
       
       const datePart = d.toLocaleDateString(undefined, {

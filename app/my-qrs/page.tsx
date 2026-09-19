@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
 import { 
   ArrowLeft, QrCode, Search, Filter, RefreshCw, Calendar, Clock,
-  ExternalLink, Copy, Check, Download, AlertCircle, Sparkles, User, FileText, AppWindow, MessageSquare, Mail, Phone, Share2, MapPin, File, ShieldCheck
+  ExternalLink, Copy, Check, Download, AlertCircle, Sparkles, User, FileText, AppWindow, MessageSquare, Mail, Phone, Share2, MapPin, File, ShieldCheck,
+  ZoomIn, X
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import AuthModal from '@/components/AuthModal';
@@ -33,6 +34,7 @@ export default function MyQrCodesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [zoomedQr, setZoomedQr] = useState<QrLogItem | null>(null);
 
   // Check auth
   useEffect(() => {
@@ -114,7 +116,12 @@ export default function MyQrCodesPage() {
 
   const formatDateTime = (isoStr: string) => {
     try {
-      const d = new Date(isoStr);
+      // Normalize legacy space-separated format (e.g. "2026-09-19 09:23:30" to UTC "2026-09-19T09:23:30Z")
+      let parseStr = isoStr;
+      if (isoStr && !isoStr.endsWith('Z') && isoStr.includes(' ')) {
+        parseStr = isoStr.replace(' ', 'T') + 'Z';
+      }
+      const d = new Date(parseStr);
       if (isNaN(d.getTime())) return { datePart: isoStr, timePart: '' };
       
       const datePart = d.toLocaleDateString(undefined, {
@@ -324,10 +331,12 @@ export default function MyQrCodesPage() {
                     </span>
                   </div>
 
-                  {/* QR Canvas Center */}
+                  {/* QR Canvas Center with Zoom Click */}
                   <div 
                     id={`qr-canvas-${log.id}`} 
-                    className="p-4 bg-slate-50/80 rounded-2xl flex items-center justify-center my-2 border border-slate-100"
+                    onClick={() => setZoomedQr(log)}
+                    className="p-4 bg-slate-50/80 rounded-2xl flex items-center justify-center my-2 border border-slate-100 cursor-pointer relative group/qr overflow-hidden hover:bg-emerald-50/30 hover:border-emerald-200 transition-all duration-200"
+                    title="Click to Zoom In"
                   >
                     <QRCodeCanvas
                       value={log.payload}
@@ -336,6 +345,11 @@ export default function MyQrCodesPage() {
                       includeMargin={false}
                       fgColor="#0f172a"
                     />
+                    {/* Hover Zoom Overlay */}
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] opacity-0 group-hover/qr:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold rounded-2xl">
+                      <ZoomIn className="w-5 h-5" />
+                      <span>Click to Zoom</span>
+                    </div>
                   </div>
 
                   {/* Payload Details */}
@@ -392,6 +406,106 @@ export default function MyQrCodesPage() {
           </div>
         )}
       </main>
+
+      {/* Full-Screen Zoom In Modal for Saved QRs */}
+      {zoomedQr && (
+        <div 
+          onClick={() => setZoomedQr(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 flex flex-col items-center animate-in zoom-in-95 duration-200"
+          >
+            {/* Modal Header */}
+            <div className="w-full flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                  {getTypeIcon(zoomedQr.qrType)}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    {zoomedQr.title || `${zoomedQr.qrType.toUpperCase()} QR Code`}
+                  </h3>
+                  <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                    {zoomedQr.qrType}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setZoomedQr(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                title="Close Zoom"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* High-Resolution Big QR Canvas */}
+            <div 
+              id={`zoomed-qr-${zoomedQr.id}`}
+              className="p-6 bg-white rounded-3xl shadow-lg border border-slate-100 flex items-center justify-center my-2"
+            >
+              <QRCodeCanvas
+                value={zoomedQr.payload}
+                size={290}
+                level="H"
+                includeMargin={false}
+                fgColor="#0f172a"
+              />
+            </div>
+
+            {/* Payload preview */}
+            <div className="w-full mt-4 bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Payload Content</span>
+              <p className="text-xs font-mono text-slate-700 break-all select-all max-h-20 overflow-y-auto custom-scrollbar">
+                {zoomedQr.payload}
+              </p>
+            </div>
+
+            {/* Action buttons */}
+            <div className="w-full flex gap-3 mt-5">
+              <button
+                onClick={() => handleCopyPayload(zoomedQr.id, zoomedQr.payload)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                {copiedId === zoomedQr.id ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span className="text-emerald-700">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 text-slate-500" />
+                    <span>Copy Content</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  const container = document.getElementById(`zoomed-qr-${zoomedQr.id}`);
+                  const canvas = container?.querySelector('canvas');
+                  if (canvas) {
+                    const url = canvas.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    a.download = `${(zoomedQr.title || zoomedQr.qrType).toLowerCase().replace(/\s+/g, '-')}-highres-qrcode.png`;
+                    a.href = url;
+                    a.click();
+                  }
+                }}
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition shadow-md shadow-emerald-600/25 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download High-Res</span>
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-400 mt-3">Click anywhere outside to close</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

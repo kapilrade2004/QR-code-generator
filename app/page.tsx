@@ -5,23 +5,23 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { 
   Link as LinkIcon, FileText, User, File, AppWindow, MessageSquare, Mail, Phone, Share2, 
   Download, Copy, Palette, CheckCircle, Volume2, MapPin, UploadCloud, AlertTriangle, 
-  Sparkles, Check, Bookmark, Calendar, Clock, Layers
+  Sparkles, Check, Bookmark, Calendar, Clock, Layers, Sliders, ExternalLink
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import AuthModal from '@/components/AuthModal';
 import ActivityModal from '@/components/ActivityModal';
 
 const tabs = [
-  { id: 'url', label: 'URL', icon: LinkIcon },
-  { id: 'pdf', label: 'PDF', icon: FileText },
-  { id: 'contact', label: 'Contact', icon: User },
-  { id: 'plain-text', label: 'Plain Text', icon: File },
-  { id: 'app', label: 'App', icon: AppWindow },
-  { id: 'location', label: 'Location', icon: MapPin },
-  { id: 'sms', label: 'SMS', icon: MessageSquare },
-  { id: 'email', label: 'Email', icon: Mail },
-  { id: 'phone', label: 'Phone', icon: Phone },
-  { id: 'social', label: 'Social', icon: Share2 }
+  { id: 'url', label: 'URL', icon: LinkIcon, desc: 'Redirect to website or landing page' },
+  { id: 'pdf', label: 'PDF', icon: FileText, desc: 'Host & share menus, catalogs, documents' },
+  { id: 'contact', label: 'Contact', icon: User, desc: 'Digital vCard business card contact' },
+  { id: 'plain-text', label: 'Plain Text', icon: File, desc: 'Display custom text, notes, serials' },
+  { id: 'app', label: 'App', icon: AppWindow, desc: 'Smart store redirect for iOS & Android' },
+  { id: 'location', label: 'Location', icon: MapPin, desc: 'Pin location on Google Maps' },
+  { id: 'sms', label: 'SMS', icon: MessageSquare, desc: 'Send SMS with predefined message' },
+  { id: 'email', label: 'Email', icon: Mail, desc: 'Send email with subject & body' },
+  { id: 'phone', label: 'Phone', icon: Phone, desc: 'Direct click-to-call mobile number' },
+  { id: 'social', label: 'Social', icon: Share2, desc: 'Social media profile link' }
 ];
 
 export default function QrCodeGeneratorPage() {
@@ -30,13 +30,15 @@ export default function QrCodeGeneratorPage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [activityModalOpen, setActivityModalOpen] = useState(false);
   
-  // Warnings and Feedback states
+  // Feedback states
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Customization
+
+  // Customization states
   const [qrColor, setQrColor] = useState('#0f172a');
+  const [qrSize, setQrSize] = useState(210);
   const [activeTab, setActiveTab] = useState('url');
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +62,7 @@ export default function QrCodeGeneratorPage() {
   const [phoneNum, setPhoneNum] = useState('');
   const [socialUrl, setSocialUrl] = useState('');
 
-  // Fetch logged in user on mount
+  // Fetch logged-in user on mount
   useEffect(() => {
     fetch('/api/auth/me')
       .then(res => res.json())
@@ -96,7 +98,7 @@ export default function QrCodeGeneratorPage() {
     }
   };
 
-  // Helper to test if QR content is blank
+  // Helper to validate whether current tab has required content
   const isQrBlank = (): boolean => {
     switch (activeTab) {
       case 'url':
@@ -124,38 +126,39 @@ export default function QrCodeGeneratorPage() {
     }
   };
 
-  // Compute payload value
+  // Compute live payload string
   const getPayload = (): string => {
     switch (activeTab) {
       case 'url':
-        return url.trim() || 'https://example.com';
+        return url.trim() || 'https://qr-studio.app';
       case 'plain-text':
-        return text.trim() || 'Your text here';
+        return text.trim() || 'Enter text to generate QR code';
       case 'pdf':
-        return pdfUrl.trim() || 'https://example.com/sample.pdf';
+        return pdfUrl.trim() || 'https://qr-studio.app/document.pdf';
       case 'contact':
-        if (!contact.firstName.trim() && !contact.mobile.trim()) return 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD';
+        if (!contact.firstName.trim() && !contact.mobile.trim()) {
+          return 'BEGIN:VCARD\nVERSION:3.0\nFN:Contact Name\nTEL:+1000000000\nEND:VCARD';
+        }
         return `BEGIN:VCARD\nVERSION:3.0\nN:${contact.lastName};${contact.firstName};;${contact.prefix};\nFN:${contact.prefix} ${contact.firstName} ${contact.lastName}\nORG:${contact.org}\nTITLE:${contact.title}\nTEL;TYPE=CELL:${contact.mobile}\nTEL;TYPE=HOME:${contact.homePhone}\nTEL;TYPE=FAX:${contact.fax}\nEMAIL:${contact.email}\nADR;TYPE=WORK:;;${contact.street};${contact.city};${contact.state};${contact.postcode};${contact.country}\nURL:${contact.website}\nEND:VCARD`;
       case 'app':
-        return appUrls.fallback.trim() || appUrls.android.trim() || appUrls.ios.trim() || 'https://example.com';
+        return appUrls.fallback.trim() || appUrls.android.trim() || appUrls.ios.trim() || 'https://qr-studio.app';
       case 'location':
         return locationStr.trim() ? `https://maps.google.com/?q=${encodeURIComponent(locationStr.trim())}` : 'https://maps.google.com/';
       case 'sms':
-        return smsData.phone.trim() ? `SMSTO:${smsData.phone.trim()}:${smsData.message}` : '';
+        return smsData.phone.trim() ? `SMSTO:${smsData.phone.trim()}:${smsData.message}` : 'SMSTO:+1000000000:Hello';
       case 'email':
-        return emailData.email.trim() ? `mailto:${emailData.email.trim()}?subject=${encodeURIComponent(emailData.subject)}&body=${encodeURIComponent(emailData.body)}` : '';
+        return emailData.email.trim() ? `mailto:${emailData.email.trim()}?subject=${encodeURIComponent(emailData.subject)}&body=${encodeURIComponent(emailData.body)}` : 'mailto:hello@qr-studio.app';
       case 'phone':
-        return phoneNum.trim() ? `tel:${phoneNum.trim()}` : '';
+        return phoneNum.trim() ? `tel:${phoneNum.trim()}` : 'tel:+1000000000';
       case 'social':
-        return socialUrl.trim() || '';
+        return socialUrl.trim() || 'https://instagram.com';
       default:
-        return url.trim() || 'https://example.com';
+        return url.trim() || 'https://qr-studio.app';
     }
   };
 
   const qrValue = getPayload();
 
-  // Log action (action: 'DOWNLOADED' | 'COPIED' | 'GENERATED')
   const logQrAction = async (action: 'GENERATED' | 'DOWNLOADED' | 'COPIED', payloadValue: string) => {
     if (!user) return;
     try {
@@ -176,23 +179,21 @@ export default function QrCodeGeneratorPage() {
 
   const showWarning = (msg: string) => {
     setWarningMessage(msg);
-    setTimeout(() => setWarningMessage(null), 4000);
+    setTimeout(() => setWarningMessage(null), 4500);
   };
 
-  // User Save Handler with Blank Validation
   const handleSave = async () => {
     if (!user) {
       setAuthModalOpen(true);
       return;
     }
 
-    // CHECK IF BLANK
     if (isQrBlank()) {
-      showWarning("⚠️ Cannot save blank QR code! Please enter the required details first.");
+      showWarning("⚠️ Cannot save blank QR code! Please enter the required data first.");
       return;
     }
 
-    await logQrAction('DOWNLOADED', qrValue); // Save explicitly as verified asset
+    await logQrAction('DOWNLOADED', qrValue);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
   };
@@ -271,8 +272,10 @@ export default function QrCodeGeneratorPage() {
     }
   };
 
+  const activeTabMeta = tabs.find(t => t.id === activeTab) || tabs[0];
+
   return (
-    <div className="min-h-screen bg-slate-50/70 flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-emerald-50/20 flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900">
       <Navbar
         user={user}
         onOpenAuth={() => setAuthModalOpen(true)}
@@ -322,7 +325,7 @@ export default function QrCodeGeneratorPage() {
             </p>
             <button
               onClick={() => setAuthModalOpen(true)}
-              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/25 transition cursor-pointer"
+              className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/25 transition cursor-pointer"
             >
               Sign In / Register
             </button>
@@ -330,42 +333,43 @@ export default function QrCodeGeneratorPage() {
         </div>
       ) : (
         /* Main Workspace */
-        <main className="p-4 md:p-8 flex-1 flex items-start justify-center overflow-auto">
+        <main className="p-4 sm:p-6 md:p-8 flex-1 flex items-start justify-center overflow-auto">
           <div className="max-w-6xl w-full flex flex-col gap-4">
             
-            {/* Warning Banner when attempting to save/export blank QR */}
+            {/* Warning Banner */}
             {warningMessage && (
-              <div className="p-4 bg-amber-50 border-2 border-amber-300/80 text-amber-900 rounded-2xl text-sm font-semibold flex items-center gap-3 shadow-md animate-in fade-in slide-in-from-top duration-200">
+              <div className="p-4 bg-amber-50/90 border border-amber-300 text-amber-900 rounded-2xl text-sm font-semibold flex items-center gap-3 shadow-md animate-in fade-in slide-in-from-top duration-200">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
                 <span className="flex-1">{warningMessage}</span>
                 <button 
                   onClick={() => setWarningMessage(null)}
-                  className="text-xs bg-amber-200/80 hover:bg-amber-300 text-amber-900 px-3 py-1 rounded-lg transition"
+                  className="text-xs bg-amber-200/90 hover:bg-amber-300 text-amber-900 px-3 py-1 rounded-xl transition cursor-pointer font-bold"
                 >
                   Dismiss
                 </button>
               </div>
             )}
 
-            <div className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-xl p-6 md:p-8 flex flex-col md:flex-row gap-8">
+            {/* Main Studio Card */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-xl p-6 sm:p-8 flex flex-col lg:flex-row gap-8">
               
-              {/* Left Side (Controls) */}
+              {/* Left Side (Editor & Controls) */}
               <div className="flex-1 flex flex-col space-y-6 min-w-0">
                 
                 {/* Header Title */}
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div>
-                    <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                      <span>QR Code Studio</span>
-                      <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        PRO
-                      </span>
+                <div className="border-b border-slate-100 pb-5">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                      QR Code Studio
                     </h2>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">Select a data type, enter details, and generate your live QR code.</p>
+                    <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      PRO
+                    </span>
                   </div>
+                  <p className="text-xs text-slate-500 font-medium mt-1">{activeTabMeta.desc}</p>
                 </div>
 
-                {/* Tabs */}
+                {/* Tab Navigation Grid */}
                 <div className="flex flex-wrap gap-2 pb-2">
                   {tabs.map(t => {
                     const Icon = t.icon;
@@ -377,70 +381,71 @@ export default function QrCodeGeneratorPage() {
                           setActiveTab(t.id);
                           setWarningMessage(null);
                         }}
-                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl min-w-[76px] transition-all cursor-pointer
-                          ${isActive 
-                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 scale-102' 
-                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60'}`}
+                        className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer font-bold text-xs ${
+                          isActive 
+                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25 scale-102' 
+                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 border border-slate-200/60'
+                        }`}
                       >
-                        <Icon className="w-5 h-5" />
-                        <span className="text-[10px] font-extrabold tracking-wide uppercase">{t.label}</span>
+                        <Icon className="w-4 h-4" />
+                        <span>{t.label}</span>
                       </button>
                     );
                   })}
                 </div>
 
-                {/* Dynamic Tab Body */}
+                {/* Tab Content Body */}
                 <div className="flex-1 overflow-auto pr-1">
                   
-                  {/* --- URL TAB --- */}
+                  {/* URL */}
                   {activeTab === 'url' && (
-                    <div className="space-y-4">
+                    <div className="space-y-3.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-slate-800 text-sm font-bold block">Website / Destination URL</label>
-                        <span className="text-[11px] text-emerald-600 font-semibold">Supports https://</span>
+                        <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">Website URL</label>
+                        <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                          <ExternalLink className="w-3 h-3" /> Live Redirect
+                        </span>
                       </div>
-                      <div className="relative">
-                        <input
-                          type="url"
-                          value={url}
-                          onChange={(e) => {
-                            setUrl(e.target.value);
-                            setWarningMessage(null);
-                          }}
-                          className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-3.5 outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 text-base font-medium transition"
-                          placeholder="e.g. https://yourcompany.com"
-                        />
-                      </div>
+                      <input
+                        type="url"
+                        value={url}
+                        onChange={(e) => {
+                          setUrl(e.target.value);
+                          setWarningMessage(null);
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-3.5 outline-none focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500 text-sm font-medium transition"
+                        placeholder="https://example.com"
+                      />
                       <p className="text-slate-400 text-xs pl-1">
                         When scanned, users will immediately open this webpage on their mobile browser.
                       </p>
                     </div>
                   )}
 
-                  {/* --- PLAIN TEXT TAB --- */}
+                  {/* PLAIN TEXT */}
                   {activeTab === 'plain-text' && (
-                    <div className="space-y-4">
-                      <label className="text-slate-800 text-sm font-bold block">Message / Raw Text</label>
+                    <div className="space-y-3.5">
+                      <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">Plain Message / Text</label>
                       <textarea
                         value={text}
                         onChange={(e) => {
                           setText(e.target.value);
                           setWarningMessage(null);
                         }}
-                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-4 outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 text-base font-medium shadow-inner min-h-[160px] resize-none"
-                        placeholder="Type any message, serial number, or note..."
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-4 outline-none focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500 text-sm font-medium shadow-inner min-h-[160px] resize-none"
+                        placeholder="Enter your message, passcodes, or instructions..."
                       />
                     </div>
                   )}
 
-                  {/* --- PDF TAB --- */}
+                  {/* PDF */}
                   {activeTab === 'pdf' && (
-                    <div className="space-y-4">
-                      <label className="text-slate-800 text-sm font-bold block">Upload PDF Document</label>
-                      <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50/50 transition relative">
+                    <div className="space-y-3.5">
+                      <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">PDF Document</label>
+                      <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50/70 transition relative bg-slate-50/30">
                         <UploadCloud className="w-10 h-10 text-emerald-600 mb-2" />
-                        <span className="text-sm font-bold text-slate-700">Click to upload your PDF</span>
-                        <span className="text-xs text-slate-400 mt-1">Directly hosts and shares your catalog, menu, or brochure</span>
+                        <span className="text-sm font-bold text-slate-800">Click or Drag to upload your PDF</span>
+                        <span className="text-xs text-slate-400 mt-1">Directly shares menus, brochures, or catalogs</span>
                         <input
                           type="file"
                           accept=".pdf"
@@ -448,148 +453,210 @@ export default function QrCodeGeneratorPage() {
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
                       </div>
-                      {isUploading && <p className="text-xs text-emerald-600 font-bold animate-pulse">Uploading file...</p>}
-                      {pdfName && <p className="text-xs text-slate-600 font-semibold">Attached: {pdfName}</p>}
+                      {isUploading && <p className="text-xs text-emerald-600 font-bold animate-pulse">Uploading file securely...</p>}
+                      {pdfName && <p className="text-xs text-slate-700 font-bold">Attached: {pdfName}</p>}
                     </div>
                   )}
 
-                  {/* --- CONTACT TAB --- */}
+                  {/* CONTACT (vCard) */}
                   {activeTab === 'contact' && (
-                    <div className="space-y-4">
-                      <label className="text-slate-800 text-sm font-bold block">vCard Contact Card</label>
+                    <div className="space-y-3.5">
+                      <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">vCard Contact Card</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input 
                           type="text" 
                           placeholder="First Name *" 
                           value={contact.firstName} 
                           onChange={e => updateContact('firstName', e.target.value)} 
-                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500" 
                         />
                         <input 
                           type="text" 
                           placeholder="Last Name" 
                           value={contact.lastName} 
                           onChange={e => updateContact('lastName', e.target.value)} 
-                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500" 
                         />
                         <input 
                           type="tel" 
                           placeholder="Mobile Phone *" 
                           value={contact.mobile} 
                           onChange={e => updateContact('mobile', e.target.value)} 
-                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500" 
                         />
                         <input 
                           type="email" 
                           placeholder="Email Address" 
                           value={contact.email} 
                           onChange={e => updateContact('email', e.target.value)} 
-                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500" 
                         />
                         <input 
                           type="text" 
                           placeholder="Organization / Company" 
                           value={contact.org} 
                           onChange={e => updateContact('org', e.target.value)} 
-                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500 sm:col-span-2" 
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500 sm:col-span-2" 
                         />
                       </div>
                     </div>
                   )}
 
-                  {/* --- LOCATION TAB --- */}
+                  {/* LOCATION */}
                   {activeTab === 'location' && (
-                    <div className="space-y-4">
-                      <label className="text-slate-800 text-sm font-bold block">Google Maps Location</label>
+                    <div className="space-y-3.5">
+                      <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">Google Maps Location</label>
                       <input
                         type="text"
                         value={locationStr}
                         onChange={(e) => setLocationStr(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-3.5 outline-none focus:border-emerald-500 text-sm"
-                        placeholder="Search landmark, address, or city..."
+                        placeholder="Search landmark, street address, or coordinates..."
                       />
                     </div>
                   )}
 
-                  {/* --- APP TAB --- */}
+                  {/* APP */}
                   {activeTab === 'app' && (
                     <div className="space-y-3">
-                      <label className="text-slate-800 text-sm font-bold block">App Store & Play Store Redirects</label>
+                      <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">Multi-Store App Redirect</label>
                       <input 
                         type="url" 
-                        placeholder="Fallback URL *" 
+                        placeholder="Fallback Web URL *" 
                         value={appUrls.fallback} 
                         onChange={e => updateApp('fallback', e.target.value)} 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500" 
                       />
                       <input 
                         type="url" 
                         placeholder="Google Play Store URL" 
                         value={appUrls.android} 
                         onChange={e => updateApp('android', e.target.value)} 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500" 
                       />
                       <input 
                         type="url" 
                         placeholder="Apple App Store URL" 
                         value={appUrls.ios} 
                         onChange={e => updateApp('ios', e.target.value)} 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-500" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500" 
                       />
                     </div>
                   )}
 
-                  {/* --- OTHER TABS (SMS, EMAIL, PHONE, SOCIAL) --- */}
-                  {!['url', 'pdf', 'contact', 'plain-text', 'app', 'location'].includes(activeTab) && (
-                    <div className="space-y-4">
-                      <label className="text-slate-800 text-sm font-bold block capitalize">{activeTab} Input</label>
+                  {/* SMS */}
+                  {activeTab === 'sms' && (
+                    <div className="space-y-3">
+                      <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">SMS Message</label>
+                      <input
+                        type="tel"
+                        placeholder="Phone Number (e.g. +1234567890) *"
+                        value={smsData.phone}
+                        onChange={e => setSmsData(prev => ({ ...prev, phone: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500"
+                      />
+                      <textarea
+                        placeholder="Predefined message content..."
+                        value={smsData.message}
+                        onChange={e => setSmsData(prev => ({ ...prev, message: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500 resize-none h-24"
+                      />
+                    </div>
+                  )}
+
+                  {/* EMAIL */}
+                  {activeTab === 'email' && (
+                    <div className="space-y-3">
+                      <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">Email Composer</label>
+                      <input
+                        type="email"
+                        placeholder="Recipient Email *"
+                        value={emailData.email}
+                        onChange={e => setEmailData(prev => ({ ...prev, email: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500"
+                      />
                       <input
                         type="text"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl px-5 py-3.5 outline-none focus:border-emerald-500 text-sm"
-                        placeholder={`Enter ${activeTab} data...`}
+                        placeholder="Subject Line"
+                        value={emailData.subject}
+                        onChange={e => setEmailData(prev => ({ ...prev, subject: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500"
+                      />
+                      <textarea
+                        placeholder="Message Body..."
+                        value={emailData.body}
+                        onChange={e => setEmailData(prev => ({ ...prev, body: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500 resize-none h-20"
+                      />
+                    </div>
+                  )}
+
+                  {/* PHONE */}
+                  {activeTab === 'phone' && (
+                    <div className="space-y-3">
+                      <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">Phone Call</label>
+                      <input
+                        type="tel"
+                        placeholder="Phone Number (e.g. +1234567890) *"
+                        value={phoneNum}
+                        onChange={e => setPhoneNum(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  )}
+
+                  {/* SOCIAL */}
+                  {activeTab === 'social' && (
+                    <div className="space-y-3">
+                      <label className="text-slate-800 text-xs font-extrabold uppercase tracking-wider block">Social Media Link</label>
+                      <input
+                        type="url"
+                        placeholder="https://instagram.com/username *"
+                        value={socialUrl}
+                        onChange={e => setSocialUrl(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-emerald-500"
                       />
                     </div>
                   )}
 
                 </div>
 
-                {/* Krisha CRM Security Banner */}
+                {/* Footer Status */}
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                   <span className="flex items-center gap-1.5 font-medium">
                     <Sparkles className="w-4 h-4 text-emerald-600" />
-                    <span>Auto-scanned & safe QR generation</span>
+                    <span>Auto-rendered vector standard QR</span>
                   </span>
-                  <span className="font-bold text-slate-700">QR Studio PRO</span>
+                  <span className="font-extrabold text-slate-700">QR Studio PRO</span>
                 </div>
               </div>
 
               {/* Right Side (QR Preview & Studio Controls) */}
-              <div className="w-full md:w-[340px] shrink-0 flex flex-col gap-4">
+              <div className="w-full lg:w-[350px] shrink-0 flex flex-col gap-4">
                 
                 {/* QR Canvas Card */}
-                <div className="bg-gradient-to-b from-slate-50 to-white rounded-3xl p-6 flex flex-col items-center justify-center border border-slate-200/90 shadow-sm relative min-h-[340px]">
+                <div className="bg-gradient-to-b from-slate-50 to-white rounded-3xl p-6 flex flex-col items-center justify-center border border-slate-200/90 shadow-sm relative min-h-[350px]">
                   
-                  {/* Watermark/Branding */}
+                  {/* Badge */}
                   <div className="text-center mb-3">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                       QR Studio • Verified
                     </span>
                   </div>
 
-                  <div ref={qrRef} className="p-4 bg-white rounded-2xl shadow-md border border-slate-100">
+                  {/* Canvas Container */}
+                  <div ref={qrRef} className="p-4 bg-white rounded-2xl shadow-md border border-slate-100 transition-transform duration-200 hover:scale-102">
                     <QRCodeCanvas 
                       value={qrValue} 
-                      size={210}
+                      size={qrSize}
                       level="H"
                       includeMargin={false}
                       fgColor={qrColor}
                     />
                   </div>
                   
-                  {/* Palette Selector */}
-                  <div className="flex items-center gap-2 mt-4">
+                  {/* Color Palette Selector */}
+                  <div className="flex items-center gap-2.5 mt-4">
                     {[
                       { color: '#0f172a', title: 'Slate Dark' },
                       { color: '#059669', title: 'Emerald Green' },
@@ -601,18 +668,32 @@ export default function QrCodeGeneratorPage() {
                         key={c.color}
                         onClick={() => setQrColor(c.color)}
                         title={c.title}
-                        className={`w-6 h-6 rounded-full transition-transform cursor-pointer ${qrColor === c.color ? 'scale-125 ring-2 ring-emerald-500 ring-offset-2' : 'hover:scale-110'}`}
+                        className={`w-6 h-6 rounded-full transition-transform cursor-pointer shadow-xs ${qrColor === c.color ? 'scale-125 ring-2 ring-emerald-500 ring-offset-2' : 'hover:scale-110'}`}
                         style={{ backgroundColor: c.color }}
                       />
                     ))}
                   </div>
+
+                  {/* Size slider */}
+                  <div className="w-full flex items-center justify-between text-[11px] text-slate-400 font-semibold px-4 mt-4 pt-3 border-t border-slate-100">
+                    <span>Size</span>
+                    <input
+                      type="range"
+                      min="160"
+                      max="240"
+                      value={qrSize}
+                      onChange={(e) => setQrSize(Number(e.target.value))}
+                      className="w-32 accent-emerald-600 cursor-pointer"
+                    />
+                    <span>{qrSize}px</span>
+                  </div>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Primary Action Buttons */}
                 <div className="flex gap-2">
                   <button 
                     onClick={handleSave}
-                    className={`flex-1 py-3 px-4 font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs text-sm ${
+                    className={`flex-1 py-3 px-4 font-bold rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs text-xs ${
                       saveSuccess 
                         ? 'bg-emerald-600 text-white shadow-md' 
                         : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
@@ -626,25 +707,25 @@ export default function QrCodeGeneratorPage() {
                     ) : (
                       <>
                         <Bookmark className="w-4 h-4 text-emerald-600" />
-                        <span>Save QR</span>
+                        <span>Save to QRs</span>
                       </>
                     )}
                   </button>
 
                   <button 
                     onClick={handleDownload} 
-                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl flex items-center justify-center transition-colors cursor-pointer border border-slate-200" 
+                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl flex items-center justify-center transition-colors cursor-pointer border border-slate-200" 
                     title="Download High-Res PNG"
                   >
-                    <Download className="w-5 h-5" />
+                    <Download className="w-4 h-4" />
                   </button>
 
                   <button 
                     onClick={handleCopy} 
-                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl flex items-center justify-center transition-colors relative cursor-pointer border border-slate-200" 
+                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl flex items-center justify-center transition-colors relative cursor-pointer border border-slate-200" 
                     title="Copy QR to Clipboard"
                   >
-                    {copied ? <CheckCircle className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5" />}
+                    {copied ? <CheckCircle className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
 

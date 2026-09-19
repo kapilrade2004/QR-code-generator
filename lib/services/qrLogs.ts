@@ -19,7 +19,7 @@ export async function createQrActivityLog(data: {
     payload: data.payload,
     metadata: data.metadata || {},
     action: data.action,
-    createdAt: new Date().toISOString().slice(0, 19).replace('T', ' ')
+    createdAt: new Date().toISOString()
   };
 
   try {
